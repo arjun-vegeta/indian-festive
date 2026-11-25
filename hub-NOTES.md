@@ -1,6 +1,6 @@
 # Festival Islands: the hub (`index.html`)
 
-Open `index.html` in Chrome. It is one file with no build step. three.js 0.160.0 loads from jsDelivr through an
+Open `index.html` in Chrome. Keep `courtyard-flags.js` beside it. three.js 0.160.0 loads from jsDelivr through an
 import map and Baloo 2 from Google Fonts, so the page needs the network. It runs from `file://`.
 
 You are a boy (eye height 1.15 m) standing in his aangan on a floating island. Dadi sits on her charpai and tells you
@@ -12,6 +12,25 @@ grain post pass, flat blue shadows, figurines, cows, huts, trees, diyas, first-p
 cue arrow, glow targets, audio, input, pause menu, hash states and self-test. What is new is listed below.
 
 ## Mechanics
+
+### Home courtyard flags
+
+| Flagsmith switch | Visible when enabled |
+|---|---|
+| `home_festival_canopy` | A striped cloth canopy with a scalloped hem hangs above Dadi's charpai. |
+| `home_rangoli_path` | Three floral rangoli patterns lead from the home spawn to Dadi. |
+
+Both are independent boolean flags. Reload and enter the courtyard to see the current settings, or open `index.html#home` to start there directly.
+
+The enabled Flagsmith string flag `home_garland_cue` controls the stool beside Dadi. The value `quiet` leaves the garland at rest. The value `glow` adds a warm pool of light and drifting petals. A player can approach the stool and press E to hang the garland on the charpai, or go straight to Dadi. Reload the hub after changing the flag.
+
+The hub uses the public client-side environment key in its `flagsmith-environment` meta tag. If the flag is unavailable, disabled, or invalid, the player sees the quiet garland and the visit is excluded from the experiment.
+
+Entering the courtyard with a valid garland flag sends `home_viewed` to Flagsmith. The first interaction with the garland or Dadi sends `garland_picked_up` or `dadi_spoken_to` respectively. Events carry the visit ID, garland variant and both decoration switches as displayed. A random browser ID in local storage lets Flagsmith associate exposures with conversions across visits.
+
+For cross-player reporting, enable the Flagsmith warehouse under Environment Settings → Warehouse. To compare pickup rates, configure an experiment with control value `quiet`, a keyed `glow` variation and an occurrence metric for `garland_picked_up`. [Flagsmith warehouse setup](https://docs.flagsmith.com/experimentation/connect-a-warehouse) · [Running an experiment](https://docs.flagsmith.com/experimentation/run-an-experiment)
+
+### Hub mechanics
 
 | Thing | How it works |
 |---|---|
