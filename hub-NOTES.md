@@ -1,4 +1,4 @@
-# Festival Islands: the hub (`index.html`)
+# Festive Islands: the hub (`index.html`)
 
 Open `index.html` in Chrome. Keep `courtyard-flags.js` beside it. three.js 0.160.0 loads from jsDelivr through an
 import map and Baloo 2 from Google Fonts, so the page needs the network. It runs from `file://`.

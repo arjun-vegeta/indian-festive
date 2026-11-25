@@ -1,4 +1,4 @@
-# Festival Islands: build plan
+# Festive Islands: build plan
 
 A first-person game that teaches Indian festivals through play. You are a boy walking across floating islands drawn on paper. **Each island is one story behind a festival.** A festival can have several stories, each on its own island. When the boy steps onto an island, he becomes the hero of that story (Rama, Krishna and so on) and plays it. The story ends by shifting into how people celebrate it today and why. Then he walks on to the next island. There are no separate modes: he simply keeps moving from story to story.
 
