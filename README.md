@@ -20,7 +20,7 @@ The game has no build step. The hub and three first-person stories load Three.js
 
 Select **Begin** to hear a short Apple Music preview chosen for each island. Each story brings its cue back once at a transition. The previews stream from Apple, and the title cards link to the recordings. The pause menu’s **Sound** slider controls the game's music, narration and effects.
 
-The four narration lines are authored in `scripts/generate-narration.ts`. Use Node 22.15 or later and set `SARVAM_API_KEY` in your environment to generate the MP3s and their manifest:
+Key conversations, including the player character's replies, are authored in `audio/dialogue.js`. Sarvam voices and the three transition cues are configured in `scripts/generate-narration.ts`. Use Node 22.15 or later and set `SARVAM_API_KEY` in your environment to generate the MP3s and their manifest:
 
 ```sh
 node --experimental-strip-types scripts/generate-narration.ts

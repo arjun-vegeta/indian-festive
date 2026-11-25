@@ -178,6 +178,7 @@
   <feColorMatrix values="0 0 0 0 .16  0 0 0 0 .13  0 0 0 0 .09  .42 0 0 0 -.14"/></filter><rect width="100%" height="100%" filter="url(#vgr)"/></svg>
   <div class="t" id="veilT">Diwali · Rama comes home</div></div>
 
+<script src="../audio/dialogue.js"></script>
 <script src="../audio/narration.js"></script>
 <script src="../audio/playback.js"></script>
 <script type="module">
@@ -885,8 +886,8 @@ const dlgEl = $('dlg');
 function dialog(n, lines, done){ G.dlg = { n, cur: n, lines, i: 0, done }; dlgEl.style.display = 'block'; showLine(); progress(); }
 function showLine(){ const [who, text] = G.dlg.lines[G.dlg.i], you = who === 'you';
   G.dlg.cur = you ? G.dlg.n : (SPEAKER[who] || G.dlg.n);
-  $('dlgWho').textContent = you ? 'Rama (you)' : who; $('dlgWho').className = 'who' + (you ? ' you' : ''); $('dlgLine').textContent = text; }
-function advance(){ if (!G.dlg) return; G.dlg.i++; if (G.dlg.i >= G.dlg.lines.length){ const f = G.dlg.done; G.dlg = null; dlgEl.style.display = 'none'; if (f) f(); } else showLine(); }
+  $('dlgWho').textContent = you ? 'Rama (you)' : who; $('dlgWho').className = 'who' + (you ? ' you' : ''); $('dlgLine').textContent = text; festivalAudio.narrateDialogue(G.dlg.lines, G.dlg.i); }
+function advance(){ if (!G.dlg) return; festivalAudio.stopVoice(); G.dlg.i++; if (G.dlg.i >= G.dlg.lines.length){ const f = G.dlg.done; G.dlg = null; dlgEl.style.display = 'none'; if (f) f(); } else showLine(); }
 
 /* ---------------- the story, beat by beat ---------------- */
 const Y = 'you';
@@ -897,21 +898,11 @@ function setBeat(b){ G.beat = b; G.beatT = 0; G.step = 0; G.later = []; }
 function startArrive(){ setBeat('arrive'); G.arriveT = 0; objective('Home to Ayodhya, on the Pushpaka Vimana', null); }
 function landed(){ G.vimLanded = true; setBeat('landed'); sfx.whoosh();
   for (let i = 0; i < 22; i++){ const a = i/22*TAU; emit(new V3(VIM_END.x + 3.3*Math.cos(a), .2, VIM_END.z + 4.5*Math.sin(a)), new V3(Math.cos(a)*1.6, 1, Math.sin(a)*1.6), .2, 1); }
-  dialog(NPC.sita, [
-    ['Sita', 'Ayodhya, at last. But the road is so dark tonight.'],
-    ['Lakshmana', 'It is Amavasya, brother. The night with no moon.'],
-    ['Hanuman', 'Bharata waits at Nandigram. I flew ahead to tell him you were coming.'],
-    [Y, 'Then let us go to him.'],
-  ], startBharata); }
+  dialog(NPC.sita, festivalDialogue.ayodhyaArrival, startBharata); }
 function startBharata(){ setBeat('bharata'); COMP.forEach(n => n.mode = 'follow');
   objective('Walk to Bharata at Nandigram', () => npcAt(NPC.bharata), ['Bharata is the one holding a lamp, by the little throne at Nandigram, just ahead.', 'Walk up to Bharata with WASD and press E.']);
   setGlow([NPC.bharata.g]); say(NPC.bharata, 'Brother! Is it you?', 4); }
-function talkBharata(){ dialog(NPC.bharata, [
-  ['Bharata', 'Brother! You are home!'],
-  ['Bharata', 'For fourteen years your padukas sat on the throne. I only kept the kingdom for you.'],
-  [Y, 'Bharata, my brother. No one could have kept it better.'],
-  ['Bharata', 'Then wear them, and walk home. Ayodhya is waiting.'],
-], () => { setBeat('padukas'); G.padT = 0; setGlow([]); G.padFrom = padG.position.clone();
+function talkBharata(){ dialog(NPC.bharata, festivalDialogue.bharataReunion, () => { setBeat('padukas'); G.padT = 0; setGlow([]); G.padFrom = padG.position.clone();
   const fw = new V2(-Math.sin(player.yaw), -Math.cos(player.yaw)); G.padTo = new V3(player.pos.x + fw.x*.85, groundAt(player.pos.x, player.pos.y) + .005, player.pos.y + fw.y*.85);
   objective('Bharata places your padukas before you', null); NPC.bharata.pose = 'namaste'; }); }
 function wearPadukas(){ G.padWorn = true; padG.visible = false; H.feet.forEach(f => f.userData.pad.visible = true); sfx.clack(); setTimeout(() => sfx.clack(), 160); sfx.bell(660);

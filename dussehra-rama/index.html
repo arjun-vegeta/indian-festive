@@ -191,6 +191,7 @@
 <div id="fatal"></div>
 <div id="fade"><svg aria-hidden="true"><filter id="grainF"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter><rect width="100%" height="100%" filter="url(#grainF)" opacity=".22"/></svg><div id="fadeT"></div></div>
 
+<script src="../audio/dialogue.js"></script>
 <script src="../audio/narration.js"></script>
 <script src="../audio/playback.js"></script>
 <script type="module">
@@ -842,8 +843,8 @@ function drawBubbles(){ const W = innerWidth, Hh = innerHeight, edgeY = { '-1': 
 const dlgEl = $('dlg');
 function dialog(n, lines, done){ G.dlg = { n, lines, i: 0, done }; dlgEl.style.display = 'block'; showLine(); progress(); }
 function showLine(){ const [who, text] = G.dlg.lines[G.dlg.i], you = who === 'you';
-  $('dlgWho').textContent = you ? 'Rama (you)' : who; $('dlgWho').className = 'who' + (you ? ' you' : ''); $('dlgLine').textContent = text; }
-function advance(){ if (!G.dlg) return; G.dlg.i++; if (G.dlg.i >= G.dlg.lines.length){ const f = G.dlg.done; G.dlg = null; dlgEl.style.display = 'none'; if (f) f(); } else showLine(); }
+  $('dlgWho').textContent = you ? 'Rama (you)' : who; $('dlgWho').className = 'who' + (you ? ' you' : ''); $('dlgLine').textContent = text; festivalAudio.narrateDialogue(G.dlg.lines, G.dlg.i); }
+function advance(){ if (!G.dlg) return; festivalAudio.stopVoice(); G.dlg.i++; if (G.dlg.i >= G.dlg.lines.length){ const f = G.dlg.done; G.dlg = null; dlgEl.style.display = 'none'; if (f) f(); } else showLine(); }
 const fadeEl = $('fade');
 function fade(on, text = ''){ $('fadeT').textContent = text; fadeEl.style.opacity = on ? 1 : 0; fadeEl.style.pointerEvents = on ? 'auto' : 'none'; }
 function leave(href, title){ festivalAudio.stop(); fade(true, title); setTimeout(() => { location.href = href; }, 640); }
@@ -858,13 +859,7 @@ function cheer(list, dur = 3){ sfx.cheer(); list.forEach((n, i) => { n.cheerUnti
 function startShore(){ setBeat('shore'); G.step = 0;
   objective('Talk to Nala, the builder', () => npcAt(NPC.nala), ['Nala is the vanara with the mallet, beside the pile of stones at the edge of the island.', 'Walk up to the glowing vanara with WASD and press E.']);
   setGlow([NPC.nala.g]); }
-function talkNala(){ dialog(NPC.nala, [
-  ['Nala', 'Prabhu Rama! There is Lanka, across the gap. Sita is there.'],
-  ['Nala', 'No boat can carry the whole vanar sena. So we will build a bridge: the setu.'],
-  ['Nala', 'Stones that carry your name do not sink. They float.'],
-  [Y, 'Then let every stone carry it, Nala.'],
-  ['Nala', 'Take a stone from the pile and set it at the end of the setu. We will help you.'],
-], startSetu); }
+function talkNala(){ dialog(NPC.nala, festivalDialogue.nalaBridge, startSetu); }
 function startSetu(){ setBeat('setu'); setuObjective(); say(NPC.v1, 'Stones for the setu!', 3); }
 const pilePos = () => PILE.clone().setY(.6);
 function setuObjective(){
@@ -904,12 +899,7 @@ function startSita(){ setBeat('sita');
   NPC.hanuman.path = [new V2(VATIKA.x + 2.6, VATIKA.y + 2.8)]; NPC.hanuman.delay = G.t + .5; NPC.hanuman.speed = 3.4; NPC.hanuman.look = NPC.sita.pos;
   objective('Walk to the Ashok Vatika and meet Sita', () => npcAt(NPC.sita), ['The Ashok Vatika is the grove of ashoka trees with orange flowers, on the left side of Lanka.', 'Walk up to Sita, who glows, and press E.']);
   setGlow([NPC.sita.g]); }
-function talkSita(){ dialog(NPC.sita, [
-  ['Sita', 'Hanuman brought me your ring, here under this ashoka tree.'],
-  ['Sita', 'From that day, I knew you would come.'],
-  [Y, 'It is over, Sita. Let us go home to Ayodhya.'],
-  ['Hanuman', cheerLine],
-], startDusk); }
+function talkSita(){ dialog(NPC.sita, festivalDialogue.sitaReunion, startDusk); }
 function startDusk(){ setBeat('dusk'); setGlow([]); objective('Dusk falls over Lanka', null); caption('The story shifts to today', 'Dussehra'); festivalAudio.musicCue(); festivalAudio.narrate('dussehraToday'); cheer([NPC.hanuman], 3); }
 function swapToToday(){ ANC.visible = false; TODAY.visible = true; G.today = true; G.dusk = .86; caption('');
   player.pos.set(0, LC + 19.5); player.yaw = 0; player.pitch = .12; NPCS.forEach(n => { n.target = null; n.path = []; }); }

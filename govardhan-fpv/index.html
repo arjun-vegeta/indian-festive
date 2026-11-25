@@ -162,6 +162,7 @@
 <div id="test"></div>
 <div id="fatal"></div>
 
+<script src="../audio/dialogue.js"></script>
 <script src="../audio/narration.js"></script>
 <script src="../audio/playback.js"></script>
 <script type="module">
@@ -624,8 +625,8 @@ function drawBubbles(){ const W = innerWidth, Hh = innerHeight, edgeY = { '-1': 
 const dlgEl = $('dlg');
 function dialog(n, lines, done){ G.dlg = { n, lines, i: 0, done }; dlgEl.style.display = 'block'; showLine(); progress(); }
 function showLine(){ const [who, text] = G.dlg.lines[G.dlg.i], you = who === 'you';
-  $('dlgWho').textContent = you ? 'Kanha (you)' : who; $('dlgWho').className = 'who' + (you ? ' you' : ''); $('dlgLine').textContent = text; }
-function advance(){ if (!G.dlg) return; G.dlg.i++; if (G.dlg.i >= G.dlg.lines.length){ const f = G.dlg.done; G.dlg = null; dlgEl.style.display = 'none'; if (f) f(); } else showLine(); }
+  $('dlgWho').textContent = you ? 'Kanha (you)' : who; $('dlgWho').className = 'who' + (you ? ' you' : ''); $('dlgLine').textContent = text; festivalAudio.narrateDialogue(G.dlg.lines, G.dlg.i); }
+function advance(){ if (!G.dlg) return; festivalAudio.stopVoice(); G.dlg.i++; if (G.dlg.i >= G.dlg.lines.length){ const f = G.dlg.done; G.dlg = null; dlgEl.style.display = 'none'; if (f) f(); } else showLine(); }
 
 /* ---------------- the story, beat by beat ---------------- */
 const Y = 'you';
@@ -636,29 +637,15 @@ function startTalk(){ G.beat = 'talk'; G.step = 0;
     ['Nanda Baba is the elder in white with the staff, beside the altar of clay pots.', 'Walk up to the glowing elder with WASD and press E.']);
   setGlow([NPC.nanda.g]); }
 const npcAt = n => new V3(n.pos.x, 1.2*n.s, n.pos.y);
-function talkNanda1(){ dialog(NPC.nanda, [
-  ['Nanda Baba', 'Kanha! Help me set out these pots. Tomorrow all of Vraj holds the great yajna for Indra, king of the sky.'],
-  [Y, 'Baba, why do we worship Indra?'],
-  ['Nanda Baba', 'Indra sends the rain. Rain grows the grass, and grass feeds our cows. It has always been so.'],
-  [Y, 'But Baba, it is Govardhan hill whose grass feeds our cows, and whose streams water our fields. We are cowherds. Our hill and our cows are our wealth.'],
-  ['Nanda Baba', 'You speak like an elder, little one. Go and ask the others. If Vraj agrees, so will I.'],
-], () => { G.step = 1; objective('Ask Vraj what they think: Subala and Yashoda Maiya (0 of 2)', () => nearestUntalked(),
+function talkNanda1(){ dialog(NPC.nanda, festivalDialogue.nandaDebate, () => { G.step = 1; objective('Ask Vraj what they think: Subala and Yashoda Maiya (0 of 2)', () => nearestUntalked(),
   ['Subala is with the cows by the stream. Yashoda Maiya is outside your home, by the hut near where you started.', 'Look for the glowing outlines, walk up and press E.']);
   setGlow([NPC.subala.g, NPC.yashoda.g]); say(NPC.subala, 'Kanha! Come and see the cows!', 4); }); }
 const nearestUntalked = () => { const c = ['subala', 'yashoda'].filter(k => !G.talked[k]).map(k => NPC[k]); c.sort((a, b) => a.pos.distanceTo(player.pos) - b.pos.distanceTo(player.pos)); return c[0] ? npcAt(c[0]) : null; };
 function afterAsk(k){ G.talked[k] = true; const n = ['subala', 'yashoda'].filter(x => G.talked[x]).length; setGlow(['subala', 'yashoda'].filter(x => !G.talked[x]).map(x => NPC[x].g));
   if (n < 2){ objective(`Ask Vraj what they think: Subala and Yashoda Maiya (${n} of 2)`, () => nearestUntalked(), G.hints); return; }
   G.step = 2; objective('Go back and tell Nanda Baba what Vraj thinks', () => npcAt(NPC.nanda), ['Nanda Baba is at the altar in the middle of the village.']); setGlow([NPC.nanda.g]); }
-function talkSubala(){ dialog(NPC.subala, [
-  ['Subala', 'Kanha! Look how the cows pull towards the hill. They know where the sweet grass grows.'],
-  [Y, 'Govardhan feeds them every day, Subala. Shall we thank the hill this year, instead of Indra?'],
-  ['Subala', 'A festival for our hill and our cows? Yes! I will tell all the gopas!'],
-], () => afterAsk('subala')); }
-function talkYashoda(){ dialog(NPC.yashoda, [
-  ['Yashoda Maiya', 'There you are, my Kanha! Have you been near the butter pots again?'],
-  [Y, 'Maiya, what if we cook for Govardhan this year? A whole mountain of food, for the hill that feeds us.'],
-  ['Yashoda Maiya', 'A mountain of food for a mountain. You and your ideas! I will start cooking.'],
-], () => afterAsk('yashoda')); }
+function talkSubala(){ dialog(NPC.subala, festivalDialogue.subalaDebate, () => afterAsk('subala')); }
+function talkYashoda(){ dialog(NPC.yashoda, festivalDialogue.yashodaDebate, () => afterAsk('yashoda')); }
 function talkNanda2(){ dialog(NPC.nanda, [
   ['Nanda Baba', 'All of Vraj speaks of Govardhan. So be it. This year we honour the hill, the cows, and each other.'],
   ['Nanda Baba', 'Bring offerings from the village to the foot of the hill, Kanha. We will follow.'],

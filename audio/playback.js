@@ -1,6 +1,7 @@
 // A classic script lets the prototypes still run directly from file URLs.
 const createFestivalAudio = (() => {
   const audioRoot = new URL('.', document.currentScript.src);
+  const conversations = new Map(Object.entries(festivalDialogue).map(([id, lines]) => [lines, id]));
   const tracks = {
     hub: {
       title: 'Raga Bhoopali (Alap)',
@@ -38,7 +39,7 @@ const createFestivalAudio = (() => {
     credit.href = track.link;
     credit.textContent = `${track.title} · ${track.artist} · Apple Music`;
 
-    let music, voice;
+    let music, voice, voiceCue;
     let started = false, paused = false, musicActive = false, quiet = false;
     let volume = .7, playAttempt = 0;
     const canPlay = () => started && !paused && !document.hidden && volume > 0;
@@ -109,6 +110,7 @@ const createFestivalAudio = (() => {
     function stopVoice() {
       const previous = voice;
       voice = undefined;
+      voiceCue = undefined;
       if (previous) previous.pause();
       mix();
     }
@@ -120,20 +122,36 @@ const createFestivalAudio = (() => {
       const audio = new Audio(new URL(clip, audioRoot).href);
       audio.volume = .8 * volume;
       voice = audio;
+      voiceCue = cue;
       mix();
       audio.addEventListener('ended', () => {
         if (voice === audio) stopVoice();
       }, { once: true });
+      syncVoice();
+    }
+
+    function narrateDialogue(lines, index) {
+      const conversation = conversations.get(lines);
+      if (conversation) narrate(`${conversation}-${index + 1}`);
+    }
+
+    function syncVoice() {
+      const audio = voice;
+      if (!audio) return;
+      if (!canPlay()) {
+        audio.pause();
+        return;
+      }
       audio.play().catch(error => {
-        if (voice !== audio) return;
-        console.warn(`Festival narration could not play (${cue})`, error);
+        if (voice !== audio || !canPlay() || error.name === 'AbortError') return;
+        console.warn(`Festival narration could not play (${voiceCue})`, error);
         stopVoice();
       });
     }
 
     function pause(on) {
       paused = on;
-      if (on) stopVoice();
+      syncVoice();
       syncMusic();
     }
 
@@ -157,6 +175,6 @@ const createFestivalAudio = (() => {
       syncMusic();
     });
     addEventListener('pagehide', stop);
-    return { start, stop, pause, tick, musicCue, narrate, stopVoice, setVolume };
+    return { start, stop, pause, tick, musicCue, narrate, narrateDialogue, stopVoice, setVolume };
   };
 })();

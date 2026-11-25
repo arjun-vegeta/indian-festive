@@ -1,18 +1,56 @@
+import { readFileSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
+import { runInNewContext } from 'node:vm';
 
-const cues = {
-  dadiWelcome: { speaker: 'kavya', text: 'There you are, beta. Come, sit with your Dadi a moment.' },
+const dialogueSource = readFileSync(new URL('../audio/dialogue.js', import.meta.url), 'utf8');
+const dialogue: Record<string, [string, string][]> = runInNewContext(dialogueSource + '\nfestivalDialogue;');
+
+const transitions = {
   dussehraToday: { speaker: 'aditya', text: 'The story shifts to today.' },
   diwaliToday: { speaker: 'kavya', text: 'Today, on Diwali night, homes everywhere light lamps the same way.' },
   govardhanClearing: { speaker: 'aditya', text: 'The clouds are parting. Indra has seen that no one in Vraj was hurt.' },
 };
 
+const voices: Record<string, string> = {
+  Dadi: 'kavya',
+  Nala: 'dev',
+  Sita: 'priya',
+  Hanuman: 'varun',
+  Lakshmana: 'aditya',
+  Bharata: 'rahul',
+  'Nanda Baba': 'anand',
+  Subala: 'manan',
+  'Yashoda Maiya': 'neha',
+};
+const playerVoices: Record<string, string> = {
+  dadiIntro: 'aayan',
+  nalaBridge: 'shubh',
+  sitaReunion: 'shubh',
+  ayodhyaArrival: 'shubh',
+  bharataReunion: 'shubh',
+  nandaDebate: 'aayan',
+  subalaDebate: 'aayan',
+  yashodaDebate: 'aayan',
+};
+
+export function narrationCues() {
+  const cues = new Map(Object.entries(transitions));
+  for (const [conversation, lines] of Object.entries(dialogue)) {
+    lines.forEach(([who, text], index) => {
+      const speaker = who === 'you' ? playerVoices[conversation] : voices[who];
+      if (!speaker) throw new Error(`No Sarvam voice for ${who} in ${conversation}.`);
+      cues.set(`${conversation}-${index + 1}`, { speaker, text });
+    });
+  }
+  return cues;
+}
+
 export async function synthesizeNarration(apiKey: string, request = fetch) {
   if (!apiKey) throw new Error('Set SARVAM_API_KEY in the environment to generate narration.');
 
   const clips = new Map<string, Buffer>();
-  for (const [id, { speaker, text }] of Object.entries(cues)) {
+  for (const [id, { speaker, text }] of narrationCues()) {
     const response = await request('https://api.sarvam.ai/text-to-speech', {
       method: 'POST',
       headers: { 'api-subscription-key': apiKey, 'Content-Type': 'application/json' },
