@@ -82,6 +82,7 @@
   #dlg .who{font-weight:800;font-size:12.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
   #dlg .who.you{color:var(--kb)}
   #dlg .line{font-size:20px;line-height:1.35;margin:1px 0 4px;font-weight:600}
+  #replayLine{pointer-events:auto;font-weight:400;font-size:inherit;margin-right:8px}
   #dlg .more{font-size:12.5px;color:var(--muted);text-align:right;font-weight:700}
   .ov #obj,.ov #hint,.ov #stats,.ov #cross,.ov #prompt,.ov #cue{display:none}
   .card{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(42,33,24,.34);z-index:10;padding:16px}
@@ -102,6 +103,7 @@
   button.go{background:var(--accent);box-shadow:3px 3px 0 var(--ink)}
   button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
   .sets{display:grid;grid-template-columns:1fr 1fr;gap:10px 22px;border-top:1px solid var(--rule);padding-top:12px;margin:0 0 14px}
+  #narrationLanguage{font:inherit;width:100%;padding:2px 6px;color:var(--ink);background:var(--paper);border:1px solid var(--rule);border-radius:6px}
   .sets label{display:block;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:800;margin-bottom:2px}
   input[type=range]{width:100%;accent-color:var(--ink)}
   /* page transition: a sheet of paper with grain, the same on every island */
@@ -128,7 +130,7 @@
   <div id="cross"></div>
   <div id="cue"><svg width="34" height="34" viewBox="-17 -17 34 34"><g id="cueArrow"><path d="M-6 -11 L8 0 L-6 11 L-2 0 Z" fill="#f6b93b" stroke="#2a2118" stroke-width="2.4" stroke-linejoin="round"/></g></svg></div>
   <div id="prompt"></div>
-  <div id="dlg" role="dialog" aria-live="polite"><div class="who" id="dlgWho"></div><div class="line" id="dlgLine"></div><div class="more">E, Space or click to go on</div></div>
+  <div id="dlg" role="dialog" aria-live="polite"><div class="who" id="dlgWho"></div><div class="line" id="dlgLine"></div><div class="more"><button type="button" id="replayLine" hidden>Replay line (R)</button>E, Space or click to go on</div></div>
 </div>
 
 <div class="card" id="title" hidden>
@@ -142,6 +144,7 @@
       <li><span class="key">Esc</span>pause and settings</li>
     </ul>
     <div class="row"><button class="go" id="begin">Begin</button></div>
+    <p class="cr"><a id="musicCredit" target="_blank" rel="noopener"></a></p>
     <p class="cr">Look inspired by <a href="https://april-zhu.com/colorfigures" target="_blank" rel="noopener">Colorfigures</a> by April Zhu (MIT). Made for Festive Hacks 2026.</p>
   </div>
 </div>
@@ -158,7 +161,10 @@
       <div><label for="sWob">Hand-drawn wobble</label><input id="sWob" type="range" min="0" max="7" step="0.1" value="2.4"></div>
       <div><label for="sGrain">Paper grain</label><input id="sGrain" type="range" min="0" max="1" step="0.05" value="0.8"></div>
       <div><label for="sSens">Mouse speed</label><input id="sSens" type="range" min="0.3" max="2.5" step="0.05" value="1"></div>
-      <div><label for="sVol">Sound</label><input id="sVol" type="range" min="0" max="1" step="0.05" value="0.7"></div>
+      <div><label for="voiceVolume">Voice</label><input id="voiceVolume" type="range" min="0" max="1" step="0.05" value="0.7"></div>
+      <div><label for="musicVolume">Music</label><input id="musicVolume" type="range" min="0" max="1" step="0.05" value="0.7"></div>
+      <div><label for="effectsVolume">Effects</label><input id="effectsVolume" type="range" min="0" max="1" step="0.05" value="0.7"></div>
+      <div><label for="narrationLanguage">Narration language</label><select id="narrationLanguage"><option value="en-IN">English</option><option value="hi-IN" lang="hi">हिन्दी</option></select></div>
     </div>
     <div class="row"><button id="forget">Forget my progress</button><button class="go" id="resume">Resume</button></div>
   </div>
@@ -167,6 +173,11 @@
 <div id="test"></div>
 <div id="fatal"></div>
 
+<script src="audio/dialogue.js"></script>
+<script src="audio/dialogue-hindi.js"></script>
+<script src="audio/narration.js"></script>
+<script src="audio/narration-hi.js"></script>
+<script src="audio/playback.js"></script>
 <script src="courtyard-flags.js"></script>
 <script type="module">
 import * as THREE from 'three';
@@ -911,13 +922,14 @@ const player = { pos: new V2(-.5, 7.4), yaw: 0, pitch: -.05, bob: 0, eye: 1.15, 
 const G = { mode: 'play', t: 0, beatT: 0, stuck: 0, started: false, paused: false, glowing: [], introDone: DONE.length > 0, lastDone: null, from: 'home',
   leaving: false, lastNav: null, objTarget: null, hints: [], hintShown: 0, onStone: null };
 const inp = { f: 0, b: 0, l: 0, r: 0, mdx: 0, mdy: 0 };
-const SET = { wob: 2.4, grain: .8, sens: 1, vol: .7 };
+const SET = { wob: 2.4, grain: .8, sens: 1 };
 
 /* ---------------- sound: bells, a soft step on stone, a gate chime, the wind up here ---------------- */
+const festivalAudio = createFestivalAudio('hub');
 const sfx = (() => {
   let ctx = null, master, windG, windBP, noiseBuf;
   function init(){ if (ctx) return; try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
-    master = ctx.createGain(); master.gain.value = SET.vol; master.connect(ctx.destination);
+    master = ctx.createGain(); master.gain.value = festivalAudio.effectsVolume(); master.connect(ctx.destination);
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate*2, ctx.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random()*2 - 1;
     const s = ctx.createBufferSource(); s.buffer = noiseBuf; s.loop = true; s.start();
     windBP = ctx.createBiquadFilter(); windBP.type = 'bandpass'; windBP.frequency.value = 420; windBP.Q.value = .7; windG = ctx.createGain(); windG.gain.value = 0;
@@ -926,7 +938,7 @@ const sfx = (() => {
   const tone = (f, v, rel, t0 = 0) => { const t = ctx.currentTime + t0, o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = f; o.connect(g); g.connect(master); env(g, t, .005, v, rel); o.start(t); o.stop(t + rel + .1); };
   return {
     init, get on(){ return !!ctx; },
-    vol(v){ if (master) master.gain.value = v; },
+    vol(v){ if (master) master.gain.setTargetAtTime(v, ctx.currentTime, .05); },
     bell(){ if (!ctx) return; for (const [f, v] of [[880, .12], [1326, .06], [2210, .03]]) tone(f, v, 1.8); },
     tock(){ if (!ctx) return; tone(320 + Math.random()*60, .07, .14); tone(640, .02, .08); },
     chime(){ if (!ctx) return; [587.33, 659.25, 880, 987.77].forEach((f, i) => tone(f, .07, 1.1, i*.09)); },
@@ -977,23 +989,12 @@ function drawSigns(){ const W = innerWidth, Hh = innerHeight, ov = G.mode === 'o
 // dialogue
 const dlgEl = $('dlg');
 function dialog(n, lines, done){ G.dlg = { n, lines, i: 0, done }; dlgEl.style.display = 'block'; showLine(); progress(); }
-function showLine(){ const [who, text] = G.dlg.lines[G.dlg.i], you = who === 'you';
-  $('dlgWho').textContent = you ? 'You' : who; $('dlgWho').className = 'who' + (you ? ' you' : ''); $('dlgLine').textContent = text; }
-function advance(){ if (!G.dlg) return; G.dlg.i++; if (G.dlg.i >= G.dlg.lines.length){ const f = G.dlg.done; G.dlg = null; dlgEl.style.display = 'none'; if (f) f(); } else showLine(); }
+function showLine(){ const [who] = G.dlg.lines[G.dlg.i], you = who === 'you';
+  $('dlgWho').textContent = you ? 'You' : who; $('dlgWho').className = 'who' + (you ? ' you' : ''); festivalAudio.narrateDialogue(G.dlg.lines, G.dlg.i); }
+function advance(){ if (!G.dlg) return; festivalAudio.stopDialogue(); G.dlg.i++; if (G.dlg.i >= G.dlg.lines.length){ const f = G.dlg.done; G.dlg = null; dlgEl.style.display = 'none'; if (f) f(); } else showLine(); }
 
 /* ---------------- Dadi, the journey and progress ---------------- */
 const Y = 'you';
-const INTRO = [
-  ['Dadi', 'There you are, beta. Come, sit with your Dadi a moment.'],
-  [Y, 'Dadi, what are all those islands floating out there?'],
-  ['Dadi', 'Each island is a story. Each story is behind a festival.'],
-  ['Dadi', 'When you step onto an island, you become the hero of its story.'],
-  ['Dadi', 'Start with Rama at Lanka. That is Dussehra.'],
-  ['Dadi', 'Then Rama walks home to Ayodhya, and everyone lights lamps for him. That is Diwali, about twenty days later.'],
-  ['Dadi', 'And the very next day, little Krishna lifts a whole hill. That is Govardhan Puja.'],
-  ['Dadi', 'That is the order I like. But every island is open. Go where your feet take you.'],
-  [Y, 'I will start with Rama, Dadi!'],
-];
 const DONE_LINES = {
   'dussehra-rama': [['Dadi', 'Shabash, beta! Rama won at Lanka. Good won over evil.'], ['Dadi', 'Now Rama walks home to Ayodhya. Go and light his way. That is Diwali.']],
   'diwali-ayodhya': [['Dadi', 'Ayodhya is full of lamps tonight. Rama is home.'], ['Dadi', 'Tomorrow is Govardhan Puja. Little Krishna has a hill to lift!']],
@@ -1020,7 +1021,7 @@ function enterCourtyard(){
   if (appearance.canopy && !ISL.home.props.getObjectByName('Festival canopy')) addCourtyardCanopy();
   if (appearance.rangoli && !ISL.home.props.getObjectByName('Rangoli path')) addRangoliPath();
 }
-function talkDadi(){ courtyardFlags.choose('dadi_spoken_to'); if (!G.introDone){ dialog(DADI, INTRO, () => { G.introDone = true; refreshObjective(); }); return; } dialog(DADI, dadiLines(), null); }
+function talkDadi(){ courtyardFlags.choose('dadi_spoken_to'); if (!G.introDone){ dialog(DADI, festivalDialogue.dadiIntro, () => { G.introDone = true; refreshObjective(); }); return; } dialog(DADI, dadiLines(), null); }
 const dadiWorld = () => { const v = new V3(); DADI.g.getWorldPosition(v); return v; };
 const yawTo = p => Math.atan2(-(p.x - player.pos.x), -(p.z - player.pos.y));
 const islandOf = id => ISL[STORY[id].isl];
@@ -1046,7 +1047,7 @@ function arrive(id){ if (!DONE.includes(id)){ DONE.push(id); saveDone(DONE); } G
 function atGate(id){ const gt = GATES[id], I = gt.I, [lx, lz] = gt.F.at(gt.pu + 4.3, 0); G.introDone = true; G.mode = 'play';
   spawnAt(I.x + lx, I.z + lz, 0); player.yaw = yawTo(gt.world()); player.pitch = .17; refreshObjective(); }
 // leave for a story: the paper sheet fades in, a one-line title, then the island page
-function leave(url, title){ G.leaving = true; G.lastNav = url; $('fadeT').textContent = title; fadeEl.classList.remove('out');
+function leave(url, title){ festivalAudio.stop(); G.leaving = true; G.lastNav = url; $('fadeT').textContent = title; fadeEl.classList.remove('out');
   if (G.selftest) return; if (locked) document.exitPointerLock(); setTimeout(() => { location.href = url; }, 640); }
 function enterStory(id){ if (G.leaving) return; const s = STORY[id]; sfx.chime(); leave(s.url + '#from=hub', `${s.fest} · ${s.story} · You are ${s.hero}`); }
 
@@ -1097,12 +1098,13 @@ addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; sfx
 function jump(){ if (!G.started || G.paused || G.mode !== 'play' || G.leaving || player.jy > 0) return; player.vy = 4.6; player.jy = 1e-4; }
 addEventListener('keyup', e => { if (KEYS[e.code]) inp[KEYS[e.code]] = 0; });
 addEventListener('blur', () => { inp.f = inp.b = inp.l = inp.r = 0; dragging = false; });
-function pauseGame(on){ G.paused = on; $('pause').hidden = !on; if (on){ inp.f = inp.b = inp.l = inp.r = 0; if (locked) document.exitPointerLock(); } else grab(); }
+function pauseGame(on){ festivalAudio.pause(on); G.paused = on; $('pause').hidden = !on; if (on){ inp.f = inp.b = inp.l = inp.r = 0; if (locked) document.exitPointerLock(); } else grab(); }
 $('resume').onclick = () => pauseGame(false);
 $('forget').onclick = () => { DONE = []; saveDone(DONE); G.lastDone = null; G.from = 'home'; G.introDone = false; refreshObjective(); pauseGame(false); };
-$('begin').onclick = () => { enterCourtyard(); $('title').hidden = true; G.started = true; sfx.init(); grab(); };
+$('begin').onclick = () => { enterCourtyard(); $('title').hidden = true; G.started = true; sfx.init(); festivalAudio.start(); grab(); };
 $('sWob').oninput = e => SET.wob = +e.target.value; $('sGrain').oninput = e => SET.grain = +e.target.value;
-$('sSens').oninput = e => SET.sens = +e.target.value; $('sVol').oninput = e => { SET.vol = +e.target.value; sfx.vol(SET.vol); };
+$('sSens').oninput = e => SET.sens = +e.target.value;
+festivalAudio.bindEffects(sfx.vol);
 
 /* ---------------- simulation ---------------- */
 function animate(dt){
@@ -1251,6 +1253,7 @@ function hud(){
 /* ---------------- main loop; the paper sheet lifts after the first frame is drawn ---------------- */
 let lastT = performance.now(), firstFrame = true;
 function frame(now){ const dt = Math.min(.05, Math.max(0, (now - lastT)/1000)); lastT = now;
+  festivalAudio.tick(!!G.dlg, dt);
   if (!G.selftestRunning){ update(dt); cameraStep(dt); render(); if (firstFrame){ firstFrame = false; requestAnimationFrame(() => { if (!G.leaving) fadeEl.classList.add('out'); }); } }
   requestAnimationFrame(frame); }
 
@@ -1308,7 +1311,7 @@ function selftest(){
     ok(!garlandCue.visible && !targets().some(t => t.obj === flowers), 'the cue and pickup prompt clear after the gift');
     startHome();
     const dw = dadiWorld(), df = new V3(0, 0, 1.5).applyQuaternion(DADI.g.getWorldQuaternion(new THREE.Quaternion()));
-    ok(walkTo(dw.x + df.x, dw.z + df.z, .5), 'walked up to Dadi'); face(dw); ok(use() && G.dlg && G.dlg.lines === INTRO, 'E on Dadi starts her intro (' + INTRO.length + ' lines)');
+    ok(walkTo(dw.x + df.x, dw.z + df.z, .5), 'walked up to Dadi'); face(dw); ok(use() && G.dlg && G.dlg.lines === festivalDialogue.dadiIntro, 'E on Dadi starts her intro (' + festivalDialogue.dadiIntro.length + ' lines)');
     finishDlg(); ok(G.introDone && G.glowing.includes(GATES['dussehra-rama'].g), 'after the intro the stones and gate to Dussehra glow');
     ok(PATHS['home>dus'].stones.every(s => G.glowing.includes(s.g)), 'the whole path home to Dussehra glows');
     ok(walkPath('home>dus'), 'walked the stepping stones to Dussehra'); ok(toGate('dussehra-rama'), 'walked up to the Dussehra torana');

@@ -65,6 +65,7 @@
   #dlg .who{font-weight:800;font-size:12.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
   #dlg .who.you{color:var(--kb)}
   #dlg .line{font-size:20px;line-height:1.35;margin:1px 0 4px;font-weight:600}
+  #replayLine{pointer-events:auto;font-weight:400;font-size:inherit;margin-right:8px}
   #dlg .more{font-size:12.5px;color:var(--muted);text-align:right;font-weight:700}
   #bal{position:absolute;left:50%;top:50%;opacity:0;transition:opacity .4s}
   #bal.show{opacity:1}
@@ -89,6 +90,7 @@
   button.go{background:var(--accent);box-shadow:3px 3px 0 var(--ink)}
   button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
   .sets{display:grid;grid-template-columns:1fr 1fr;gap:10px 22px;border-top:1px solid var(--rule);padding-top:12px;margin:0 0 14px}
+  #narrationLanguage{font:inherit;width:100%;padding:2px 6px;color:var(--ink);background:var(--paper);border:1px solid var(--rule);border-radius:6px}
   .sets label{display:block;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:800;margin-bottom:2px}
   input[type=range]{width:100%;accent-color:var(--ink)}
   #test{position:fixed;left:12px;bottom:12px;z-index:20;background:var(--paper);border:2px solid var(--ink);border-radius:12px;box-shadow:4px 4px 0 var(--ink);
@@ -113,7 +115,7 @@
     <circle id="balDot" r="9" fill="#f6b93b" stroke="#2a2118" stroke-width="2.6"/>
   </svg></div>
   <div id="prompt"></div>
-  <div id="dlg" role="dialog" aria-live="polite"><div class="who" id="dlgWho"></div><div class="line" id="dlgLine"></div><div class="more">E, Space or click to go on</div></div>
+  <div id="dlg" role="dialog" aria-live="polite"><div class="who" id="dlgWho"></div><div class="line" id="dlgLine"></div><div class="more"><button type="button" id="replayLine" hidden>Replay line (R)</button>E, Space or click to go on</div></div>
 </div>
 
 <div class="card" id="title" hidden>
@@ -128,6 +130,7 @@
       <li><span class="key">Esc</span>pause and settings</li>
     </ul>
     <div class="row"><button class="go" id="begin">Begin</button></div>
+    <p class="cr"><a id="musicCredit" target="_blank" rel="noopener"></a></p>
     <p class="cr">Look inspired by <a href="https://april-zhu.com/colorfigures" target="_blank" rel="noopener">Colorfigures</a> by April Zhu (MIT). Made for Festive Hacks 2026.</p>
   </div>
 </div>
@@ -145,7 +148,10 @@
       <div><label for="sWob">Hand-drawn wobble</label><input id="sWob" type="range" min="0" max="7" step="0.1" value="2.4"></div>
       <div><label for="sGrain">Paper grain</label><input id="sGrain" type="range" min="0" max="1" step="0.05" value="0.8"></div>
       <div><label for="sSens">Mouse speed</label><input id="sSens" type="range" min="0.3" max="2.5" step="0.05" value="1"></div>
-      <div><label for="sVol">Sound</label><input id="sVol" type="range" min="0" max="1" step="0.05" value="0.7"></div>
+      <div><label for="voiceVolume">Voice</label><input id="voiceVolume" type="range" min="0" max="1" step="0.05" value="0.7"></div>
+      <div><label for="musicVolume">Music</label><input id="musicVolume" type="range" min="0" max="1" step="0.05" value="0.7"></div>
+      <div><label for="effectsVolume">Effects</label><input id="effectsVolume" type="range" min="0" max="1" step="0.05" value="0.7"></div>
+      <div><label for="narrationLanguage">Narration language</label><select id="narrationLanguage"><option value="en-IN">English</option><option value="hi-IN" lang="hi">हिन्दी</option></select></div>
     </div>
     <div class="row"><button id="restart">Start again</button><button class="go" id="resume">Resume</button></div>
   </div>
@@ -161,6 +167,11 @@
 <div id="test"></div>
 <div id="fatal"></div>
 
+<script src="../audio/dialogue.js"></script>
+<script src="../audio/dialogue-hindi.js"></script>
+<script src="../audio/narration.js"></script>
+<script src="../audio/narration-hi.js"></script>
+<script src="../audio/playback.js"></script>
 <script type="module">
 import * as THREE from 'three';
 THREE.ColorManagement.enabled = false;
@@ -549,26 +560,28 @@ const G = { beat: 'talk', step: 0, t: 0, storm: 0, stormT: 0, night: 0, rainbow:
   fluteT: 0, noteI: 0, rippleT: 0, relentT: 0, celebrateT: 0, ended: false, paused: false, started: false, hillHome: true, holdingHill: false,
   hillFrom: new V3(), dayLine: 0, beatT: 0, glowing: [], hintShown: 0, objTarget: null, lastObj: '' };
 const inp = { f: 0, b: 0, l: 0, r: 0, hold: false, flute: false, mdx: 0, mdy: 0, e: false };
-const SET = { wob: 2.4, grain: .8, sens: 1, vol: .7 };
+const SET = { wob: 2.4, grain: .8, sens: 1 };
 
 /* ---------------- sound: synthesised flute, rain, wind, thunder, bells ---------------- */
+const festivalAudio = createFestivalAudio('govardhan');
 const sfx = (() => {
-  let ctx = null, master, rainG, rainLP, windG, windBP, rumbleG, noiseBuf;
+  let ctx = null, master, rainG, rainLP, edgeRain, windG, windBP, rumbleG, noiseBuf;
   const SCALE = [293.66, 329.63, 369.99, 440, 493.88, 587.33, 659.25];
   const TUNE = [2, 3, 4, 5, 4, 3, 2, 1, 0, 1, 2, 3, 3, 4, 5, 6, 5, 4, 3, 2];
   function init(){ if (ctx) return; try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
-    master = ctx.createGain(); master.gain.value = SET.vol; master.connect(ctx.destination);
+    master = ctx.createGain(); master.gain.value = festivalAudio.effectsVolume(); master.connect(ctx.destination);
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate*2, ctx.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random()*2 - 1;
     const loop = () => { const s = ctx.createBufferSource(); s.buffer = noiseBuf; s.loop = true; s.start(); return s; };
     const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 700; rainLP = ctx.createBiquadFilter(); rainLP.type = 'lowpass'; rainLP.frequency.value = 6000;
     rainG = ctx.createGain(); rainG.gain.value = 0; loop().connect(hp); hp.connect(rainLP); rainLP.connect(rainG); rainG.connect(master);
+    edgeRain = createPositionalAmbience(ctx, rainLP, master);
     windBP = ctx.createBiquadFilter(); windBP.type = 'bandpass'; windBP.frequency.value = 380; windBP.Q.value = .8; windG = ctx.createGain(); windG.gain.value = 0;
     loop().connect(windBP); windBP.connect(windG); windG.connect(master);
     const ro = ctx.createOscillator(); ro.frequency.value = 44; rumbleG = ctx.createGain(); rumbleG.gain.value = 0; ro.connect(rumbleG); rumbleG.connect(master); ro.start(); }
   function env(g, t, a, peak, rel){ g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + rel); }
   return {
     init, get on(){ return !!ctx; },
-    vol(v){ if (master) master.gain.value = v; },
+    vol(v){ if (master) master.gain.setTargetAtTime(v, ctx.currentTime, .05); },
     note(){ if (!ctx) return; const f = SCALE[TUNE[G.noteI++%TUNE.length]], t = ctx.currentTime;
       const o = ctx.createOscillator(), o2 = ctx.createOscillator(), g = ctx.createGain(), g2 = ctx.createGain(), lfo = ctx.createOscillator(), lg = ctx.createGain();
       o.type = 'sine'; o.frequency.value = f; o2.type = 'triangle'; o2.frequency.value = f*2; g2.gain.value = .12;
@@ -582,7 +595,13 @@ const sfx = (() => {
     bell(){ if (!ctx) return; const t = ctx.currentTime; for (const [f, v] of [[880, .12], [1326, .06], [2210, .03]]){ const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = f; o.connect(g); g.connect(master); env(g, t, .005, v, 1.8); o.start(t); o.stop(t + 2); } },
     gust(){ if (!ctx) return; const t = ctx.currentTime; windG.gain.cancelScheduledValues(t); windG.gain.setValueAtTime(windG.gain.value, t); windG.gain.linearRampToValueAtTime(.32, t + .4); windG.gain.linearRampToValueAtTime(.06*G.storm, t + 1.8);
       windBP.frequency.setValueAtTime(300, t); windBP.frequency.linearRampToValueAtTime(700, t + .6); windBP.frequency.linearRampToValueAtTime(320, t + 1.8); },
-    tick(){ if (!ctx) return; const under = G.holdingHill ? 1 : 0; rainG.gain.value = .16*G.storm*(G.beat === 'end' ? 0 : 1); rainLP.frequency.value = under ? 900 : 6000;
+    tick(){ if (!ctx) return; const under = G.holdingHill && hillRho() < 1;
+      const easing = G.beat === 'relent' ? clamp(1 - G.relentT/3) : G.beat === 'end' ? 0 : 1;
+      const rain = G.storm * easing;
+      rainG.gain.setTargetAtTime(rain*(under ? .04 : .16), ctx.currentTime, .15);
+      rainLP.frequency.setTargetAtTime(under ? 1250 : 6000, ctx.currentTime, .2);
+      const edge = hillNear();
+      edgeRain(edge.x, edge.z, player, G.holdingHill ? rain*.13 : 0, 21);
       rumbleG.gain.value = G.beat === 'lift' && inp.hold ? .18 : (G.beat === 'lower' && inp.hold ? .12 : 0); },
   };
 })();
@@ -619,9 +638,9 @@ function drawBubbles(){ const W = innerWidth, Hh = innerHeight, edgeY = { '-1': 
 // dialogue
 const dlgEl = $('dlg');
 function dialog(n, lines, done){ G.dlg = { n, lines, i: 0, done }; dlgEl.style.display = 'block'; showLine(); progress(); }
-function showLine(){ const [who, text] = G.dlg.lines[G.dlg.i], you = who === 'you';
-  $('dlgWho').textContent = you ? 'Kanha (you)' : who; $('dlgWho').className = 'who' + (you ? ' you' : ''); $('dlgLine').textContent = text; }
-function advance(){ if (!G.dlg) return; G.dlg.i++; if (G.dlg.i >= G.dlg.lines.length){ const f = G.dlg.done; G.dlg = null; dlgEl.style.display = 'none'; if (f) f(); } else showLine(); }
+function showLine(){ const [who] = G.dlg.lines[G.dlg.i], you = who === 'you';
+  $('dlgWho').textContent = you ? 'Kanha (you)' : who; $('dlgWho').className = 'who' + (you ? ' you' : ''); festivalAudio.narrateDialogue(G.dlg.lines, G.dlg.i); }
+function advance(){ if (!G.dlg) return; festivalAudio.stopDialogue(); G.dlg.i++; if (G.dlg.i >= G.dlg.lines.length){ const f = G.dlg.done; G.dlg = null; dlgEl.style.display = 'none'; if (f) f(); } else showLine(); }
 
 /* ---------------- the story, beat by beat ---------------- */
 const Y = 'you';
@@ -632,29 +651,15 @@ function startTalk(){ G.beat = 'talk'; G.step = 0;
     ['Nanda Baba is the elder in white with the staff, beside the altar of clay pots.', 'Walk up to the glowing elder with WASD and press E.']);
   setGlow([NPC.nanda.g]); }
 const npcAt = n => new V3(n.pos.x, 1.2*n.s, n.pos.y);
-function talkNanda1(){ dialog(NPC.nanda, [
-  ['Nanda Baba', 'Kanha! Help me set out these pots. Tomorrow all of Vraj holds the great yajna for Indra, king of the sky.'],
-  [Y, 'Baba, why do we worship Indra?'],
-  ['Nanda Baba', 'Indra sends the rain. Rain grows the grass, and grass feeds our cows. It has always been so.'],
-  [Y, 'But Baba, it is Govardhan hill whose grass feeds our cows, and whose streams water our fields. We are cowherds. Our hill and our cows are our wealth.'],
-  ['Nanda Baba', 'You speak like an elder, little one. Go and ask the others. If Vraj agrees, so will I.'],
-], () => { G.step = 1; objective('Ask Vraj what they think: Subala and Yashoda Maiya (0 of 2)', () => nearestUntalked(),
+function talkNanda1(){ dialog(NPC.nanda, festivalDialogue.nandaDebate, () => { G.step = 1; objective('Ask Vraj what they think: Subala and Yashoda Maiya (0 of 2)', () => nearestUntalked(),
   ['Subala is with the cows by the stream. Yashoda Maiya is outside your home, by the hut near where you started.', 'Look for the glowing outlines, walk up and press E.']);
   setGlow([NPC.subala.g, NPC.yashoda.g]); say(NPC.subala, 'Kanha! Come and see the cows!', 4); }); }
 const nearestUntalked = () => { const c = ['subala', 'yashoda'].filter(k => !G.talked[k]).map(k => NPC[k]); c.sort((a, b) => a.pos.distanceTo(player.pos) - b.pos.distanceTo(player.pos)); return c[0] ? npcAt(c[0]) : null; };
 function afterAsk(k){ G.talked[k] = true; const n = ['subala', 'yashoda'].filter(x => G.talked[x]).length; setGlow(['subala', 'yashoda'].filter(x => !G.talked[x]).map(x => NPC[x].g));
   if (n < 2){ objective(`Ask Vraj what they think: Subala and Yashoda Maiya (${n} of 2)`, () => nearestUntalked(), G.hints); return; }
   G.step = 2; objective('Go back and tell Nanda Baba what Vraj thinks', () => npcAt(NPC.nanda), ['Nanda Baba is at the altar in the middle of the village.']); setGlow([NPC.nanda.g]); }
-function talkSubala(){ dialog(NPC.subala, [
-  ['Subala', 'Kanha! Look how the cows pull towards the hill. They know where the sweet grass grows.'],
-  [Y, 'Govardhan feeds them every day, Subala. Shall we thank the hill this year, instead of Indra?'],
-  ['Subala', 'A festival for our hill and our cows? Yes! I will tell all the gopas!'],
-], () => afterAsk('subala')); }
-function talkYashoda(){ dialog(NPC.yashoda, [
-  ['Yashoda Maiya', 'There you are, my Kanha! Have you been near the butter pots again?'],
-  [Y, 'Maiya, what if we cook for Govardhan this year? A whole mountain of food, for the hill that feeds us.'],
-  ['Yashoda Maiya', 'A mountain of food for a mountain. You and your ideas! I will start cooking.'],
-], () => afterAsk('yashoda')); }
+function talkSubala(){ dialog(NPC.subala, festivalDialogue.subalaDebate, () => afterAsk('subala')); }
+function talkYashoda(){ dialog(NPC.yashoda, festivalDialogue.yashodaDebate, () => afterAsk('yashoda')); }
 function talkNanda2(){ dialog(NPC.nanda, [
   ['Nanda Baba', 'All of Vraj speaks of Govardhan. So be it. This year we honour the hill, the cows, and each other.'],
   ['Nanda Baba', 'Bring offerings from the village to the foot of the hill, Kanha. We will follow.'],
@@ -698,8 +703,8 @@ const DAYLINES = [['yashoda', 'Rest your arm, my child. No? Then at least eat a 
 function startDays(){ G.beat = 'days'; G.day = 1; G.dayT = 0; G.dayLine = 0; G.nextGust = 2; G.bal.set(0, 0); progress(); setGlow([]);
   objective('Hold Govardhan steady while the storm rages', null, ['Each time the wind pushes the dot, move the mouse against it. The days only pass while the hill is steady.']);
   shelterDiyas.forEach((d, i) => { const a = (i + .5)/shelterDiyas.length*TAU + .3; d.position.set(hill.pos.x + Math.cos(a)*2.6, 0, hill.pos.z + Math.sin(a)*2.6); d.visible = true; }); }
-function startRelent(){ G.beat = 'relent'; G.relentT = 0; G.gust = null; progress();
-  objective('The rain is stopping', null); say(NPC.nanda, 'The clouds are parting. Indra has seen that no one in Vraj was hurt.', 5);
+function startRelent(){ G.beat = 'relent'; festivalAudio.musicCue(); festivalAudio.narrate('govardhanClearing'); G.relentT = 0; G.gust = null; progress();
+  objective('The rain is stopping', null); say(NPC.nanda, festivalAudio.transitionText('govardhanClearing', 'The clouds are parting. Indra has seen that no one in Vraj was hurt.'), 5);
   NPCS.forEach((n, i) => { n.mode = 'walk'; n.safe = false; const a = PI*.12 + (i/(NPCS.length - 1))*PI*.76, r = n.cow ? 7.5 : 4.6;
     n.target = new V2(ANNA.x + r*1.2*Math.cos(a), ANNA.y + 1 + r*Math.sin(a)); n.speed = n.cow ? 1.6 : 2; n.pose = 'down'; }); }
 function startLower(){ G.beat = 'lower'; G.lower = 0; G.hillFrom.copy(hill.pos); progress();
@@ -764,14 +769,15 @@ addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; sfx
   if (e.code === 'KeyF'){ inp.flute = true; } });
 addEventListener('keyup', e => { if (KEYS[e.code]) inp[KEYS[e.code]] = 0; if (e.code === 'Space') inp.hold = false; if (e.code === 'KeyF') inp.flute = false; });
 addEventListener('blur', () => { inp.f = inp.b = inp.l = inp.r = 0; inp.hold = inp.flute = false; dragging = false; });
-function pauseGame(on){ G.paused = on; $('pause').hidden = !on; if (on){ inp.hold = inp.flute = false; inp.f = inp.b = inp.l = inp.r = 0; if (locked) document.exitPointerLock(); } else grab(); }
+function pauseGame(on){ festivalAudio.pause(on); G.paused = on; $('pause').hidden = !on; if (on){ inp.hold = inp.flute = false; inp.f = inp.b = inp.l = inp.r = 0; if (locked) document.exitPointerLock(); } else grab(); }
 $('resume').onclick = () => pauseGame(false);
 $('restart').onclick = () => { location.hash = ''; location.reload(); };
 $('again').onclick = () => { location.hash = ''; location.reload(); };
 $('stay').onclick = () => { $('end').hidden = true; G.ended = false; grab(); };
-$('begin').onclick = () => { $('title').hidden = true; G.started = true; sfx.init(); grab(); };
+$('begin').onclick = () => { $('title').hidden = true; G.started = true; sfx.init(); festivalAudio.start(); grab(); };
 $('sWob').oninput = e => SET.wob = +e.target.value; $('sGrain').oninput = e => SET.grain = +e.target.value;
-$('sSens').oninput = e => SET.sens = +e.target.value; $('sVol').oninput = e => { SET.vol = +e.target.value; sfx.vol(SET.vol); };
+$('sSens').oninput = e => SET.sens = +e.target.value;
+festivalAudio.bindEffects(sfx.vol);
 
 /* ---------------- simulation ---------------- */
 const BALANCE_BEATS = ['balance', 'days'];
@@ -1041,6 +1047,7 @@ function hud(){
 /* ---------------- main loop ---------------- */
 let lastT = performance.now();
 function frame(now){ const dt = Math.min(.05, Math.max(0, (now - lastT)/1000)); lastT = now;
+  festivalAudio.tick(!!G.dlg, dt);
   if (!G.selftestRunning){ update(dt); cameraStep(dt); render(); }
   requestAnimationFrame(frame); }
 
@@ -1133,7 +1140,7 @@ if (location.hash.slice(1).split('&').includes('from=hub')){
   requestAnimationFrame(() => requestAnimationFrame(() => fade.classList.add('out')));
   const back = document.createElement('button'); back.id = 'backHub'; back.className = 'go'; back.textContent = 'Back to the islands';
   $('end').querySelector('.row').appendChild(back);
-  back.onclick = () => { fade.querySelector('.t').textContent = 'Back to the islands'; fade.classList.remove('out'); setTimeout(() => { location.href = '../index.html#done=govardhan'; }, 640); };
+  back.onclick = () => { festivalAudio.stop(); fade.querySelector('.t').textContent = 'Back to the islands'; fade.classList.remove('out'); setTimeout(() => { location.href = '../index.html#done=govardhan'; }, 640); };
 }
 
 window.GAME = { G, player, NPC, hill, inp };
