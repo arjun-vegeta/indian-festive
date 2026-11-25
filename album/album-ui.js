@@ -77,9 +77,10 @@ const CSS = `
 .fa-stamp{position:absolute;right:-4px;top:-6px;transform:rotate(9deg);border:2px solid #2a2118;border-radius:999px;background:#f6b93b;
   font-weight:800;font-size:13px;padding:1px 11px;box-shadow:2px 2px 0 #2a2118}
 .fa-photos{position:relative;flex:1;display:flex;flex-direction:column;align-items:flex-start;min-height:0;padding-top:4px}
-.fa-left .fa-photos>:nth-child(2){align-self:flex-end;margin-top:-30px}
+.fa-left .fa-photos{padding-right:40px}
+.fa-left .fa-photos>:nth-child(2){align-self:flex-end;margin-top:2px}
 .fa-right .fa-photos{align-items:center;padding-top:10px}
-.fa-ph{position:relative;margin:0;flex:none;width:min(58%,31vh);transform:rotate(var(--r,0deg)) translateY(var(--y,0px));background:#fffdf6;
+.fa-ph{position:relative;margin:0;flex:none;width:min(52%,27vh);transform:rotate(var(--r,0deg)) translateY(var(--y,0px));background:#fffdf6;
   padding:8px 8px 6px;border:1.5px solid #2a2118;box-shadow:3px 3px 0 rgba(42,33,24,.85)}
 .fa-ph .im{position:relative;aspect-ratio:4/3;overflow:hidden;background:#e6dcc5}
 .fa-ph.tall{width:min(42%,23vh)}.fa-ph.tall .im{aspect-ratio:3/4}
@@ -90,7 +91,7 @@ const CSS = `
 .fa-ph i{position:absolute;width:15px;height:15px;background:#2a2118}
 .fa-ph i.a{top:-4px;left:-4px;clip-path:polygon(0 0,100% 0,0 100%)}.fa-ph i.b{top:-4px;right:-4px;clip-path:polygon(0 0,100% 0,100% 100%)}
 .fa-ph i.c{bottom:-4px;left:-4px;clip-path:polygon(0 0,0 100%,100% 100%)}.fa-ph i.d{bottom:-4px;right:-4px;clip-path:polygon(100% 0,100% 100%,0 100%)}
-.fa-slot{flex:none;width:min(58%,31vh);aspect-ratio:4/3;border:2px dashed rgba(42,33,24,.45);border-radius:6px;display:flex;flex-direction:column;
+.fa-slot{flex:none;width:min(52%,27vh);aspect-ratio:4/3;border:2px dashed rgba(42,33,24,.45);border-radius:6px;display:flex;flex-direction:column;
   align-items:center;justify-content:center;text-align:center;padding:10px;color:#8a7f6c;font-weight:700;font-size:14px;line-height:1.25;
   transform:rotate(var(--r,0deg)) translateY(var(--y,0px))}
 .fa-right .fa-slot{width:min(68%,40vh)}
