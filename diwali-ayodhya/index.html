@@ -131,6 +131,7 @@
     <ul>
       <li><span class="key">WASD</span>walk, and look around with the mouse</li>
       <li><span class="key">E</span>talk to people, pick things up, light lamps</li>
+      <li><span class="key">Space</span>jump, and hold <span class="key">Shift</span> to run</li>
       <li><span class="key">Esc</span>pause and settings</li>
     </ul>
     <div class="row"><button class="go" id="begin">Begin</button></div>
@@ -145,9 +146,10 @@
       <li><span class="key">WASD</span>walk. Move the mouse to look. If the mouse is not captured, drag to look.</li>
       <li><span class="key">E</span>talk, pick up, light a lamp, fill a petal</li>
       <li><span class="key">Space</span>or click: go on in a talk</li>
+      <li><span class="key">Space</span>jump, and hold <span class="key">Shift</span> to run</li>
     </ul>
     <div class="sets">
-      <div><label for="sWob">Hand-drawn wobble</label><input id="sWob" type="range" min="0" max="7" step="0.1" value="2.4"></div>
+      <div><label for="sWob">Hand-drawn wobble</label><input id="sWob" type="range" min="0" max="7" step="0.1" value="1.8"></div>
       <div><label for="sGrain">Paper grain</label><input id="sGrain" type="range" min="0" max="1" step="0.05" value="0.8"></div>
       <div><label for="sSens">Mouse speed</label><input id="sSens" type="range" min="0.3" max="2.5" step="0.05" value="1"></div>
       <div><label for="voiceVolume">Voice</label><input id="voiceVolume" type="range" min="0" max="1" step="0.05" value="0.7"></div>
@@ -815,12 +817,12 @@ function poseHands(dt, target){ const T = POSE[target], k = 1 - Math.exp(-dt*7);
 }
 
 /* ---------------- state ---------------- */
-const player = { pos: new V2(0, EDGE_S), y: 0, yaw: 0, pitch: -.08, bob: 0, eye: 1.6, pose: 'rest', vel: 0, stepI: 0 };
+const player = { pos: new V2(0, EDGE_S), y: 0, yaw: 0, pitch: -.08, bob: 0, eye: 1.6, pose: 'rest', vel: 0, stepI: 0, jy: 0, vy: 0, land: 0, spr: 0 };
 const G = { beat: 'title', step: 0, t: 0, beatT: 0, night: .5, stuck: 0, talked: {}, dlg: null, glowing: [], hintShown: 0, objTarget: null, hints: [],
   arriveT: 0, vimLanded: false, padT: 0, padWorn: false, lampsOn: false, warm: new THREE.Vector4(999, 999, 0, 0), bowT: 0, colour: null, filled: 0,
   wallLit: 0, puja: {}, aartiT: 0, holding: null, ended: false, paused: false, started: false, veiled: false, today: false, shake: 0, from: '', drone: 0 };
 const inp = { f: 0, b: 0, l: 0, r: 0, mdx: 0, mdy: 0 };
-const SET = { wob: 2.4, grain: .8, sens: 1 };
+const SET = { wob: 1.8, grain: .8, sens: 1 };
 
 /* ---------------- sound: lamp ticks, bells, wooden padukas, crickets, a soft drone ---------------- */
 const festivalAudio = createFestivalAudio('diwali');
@@ -1044,16 +1046,16 @@ addEventListener('mousemove', e => { if (locked){ inp.mdx += e.movementX; inp.md
 canvas.addEventListener('touchstart', e => { const t = e.touches[0]; dragging = true; lastX = t.clientX; lastY = t.clientY; }, { passive: true });
 canvas.addEventListener('touchmove', e => { const t = e.touches[0]; inp.mdx += (t.clientX - lastX)*1.4; inp.mdy += (t.clientY - lastY)*1.4; lastX = t.clientX; lastY = t.clientY; }, { passive: true });
 canvas.addEventListener('touchend', () => { dragging = false; });
-const KEYS = { KeyW: 'f', ArrowUp: 'f', KeyS: 'b', ArrowDown: 'b', KeyA: 'l', ArrowLeft: 'l', KeyD: 'r', ArrowRight: 'r' };
+const KEYS = { KeyW: 'f', ArrowUp: 'f', KeyS: 'b', ArrowDown: 'b', KeyA: 'l', ArrowLeft: 'l', KeyD: 'r', ArrowRight: 'r', ShiftLeft: 'run', ShiftRight: 'run' };
 addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; sfx.init();
   if (e.code === 'Escape' || e.code === 'KeyP'){ if (G.started && !G.ended) pauseGame(!G.paused); return; }
   if (!G.started || G.paused) return;
   if (KEYS[e.code]){ inp[KEYS[e.code]] = 1; e.preventDefault(); }
   if (e.code === 'KeyE' || e.code === 'Enter'){ if (G.dlg) advance(); else { const t = focusTarget(); if (t) t.use(); } }
-  if (e.code === 'Space'){ e.preventDefault(); if (G.dlg) advance(); } });
+  if (e.code === 'Space'){ e.preventDefault(); if (G.dlg) advance(); else if (!e.repeat) jump(); } });
 addEventListener('keyup', e => { if (KEYS[e.code]) inp[KEYS[e.code]] = 0; });
-addEventListener('blur', () => { inp.f = inp.b = inp.l = inp.r = 0; dragging = false; });
-function pauseGame(on){ festivalAudio.pause(on); G.paused = on; $('pause').hidden = !on; if (on){ inp.f = inp.b = inp.l = inp.r = 0; if (locked) document.exitPointerLock(); } else grab(); }
+addEventListener('blur', () => { inp.f = inp.b = inp.l = inp.r = inp.run = 0; dragging = false; });
+function pauseGame(on){ festivalAudio.pause(on); G.paused = on; $('pause').hidden = !on; if (on){ inp.f = inp.b = inp.l = inp.r = inp.run = 0; if (locked) document.exitPointerLock(); } else grab(); }
 function leave(url, line){ festivalAudio.stop(); $('veilT').textContent = line; $('veil').classList.remove('off'); setTimeout(() => { location.href = url; }, 650); }
 $('resume').onclick = () => pauseGame(false);
 $('restart').onclick = () => { location.hash = G.from ? 'from=' + G.from : ''; location.reload(); };
@@ -1067,18 +1069,23 @@ festivalAudio.bindEffects(sfx.vol);
 /* ---------------- simulation ---------------- */
 function camAuto(){ return G.dlg || ['lit', 'shift'].includes(G.beat) || G.aartiT > 0; }
 let lastDist = 1e9;
+// Space jumps (about 0.6 m), Shift sprints.
+function jump(){ if (!G.started || G.paused || player.jy > 0 || camAuto() || ['arrive', 'landed', 'title'].includes(G.beat)) return false; player.vy = 4.6; player.jy = 1e-4; return true; }
 function update(dt){
   G.t += dt; G.beatT += dt;
   const md = { x: inp.mdx*SET.sens, y: inp.mdy*SET.sens }; inp.mdx = inp.mdy = 0;
   if (G.paused || !G.started) return;
   if (!camAuto()){ player.yaw -= md.x*.0023; player.pitch = clamp(player.pitch - md.y*.0023, -1.3, 1.2); }
   const canWalk = !G.dlg && !['arrive', 'landed', 'lit', 'shift', 'title'].includes(G.beat) && !(G.beat === 'padukas' && G.padT < 1.5) && G.aartiT <= 0;
+  const sprint = !!inp.run && canWalk;
   const mv = new V2((inp.r - inp.l), (inp.b - inp.f)); let moving = false; const ox = player.pos.x, oz = player.pos.y;
-  if (canWalk && mv.lengthSq() > 0){ mv.normalize().multiplyScalar(4.3*dt); const c = Math.cos(player.yaw), s = Math.sin(player.yaw);
+  if (canWalk && mv.lengthSq() > 0){ mv.normalize().multiplyScalar(4.3*(sprint ? 1.7 : 1)*dt); const c = Math.cos(player.yaw), s = Math.sin(player.yaw);
     player.pos.x += mv.x*c + mv.y*s; player.pos.y += -mv.x*s + mv.y*c; moving = true; progressIfCloser(); }
   if (G.beat !== 'arrive'){ collide(player.pos, .35, true); slide(player.pos, ox, oz); }
   if (G.beat !== 'arrive') player.y = lerp(player.y, groundAt(player.pos.x, player.pos.y), 1 - Math.exp(-dt*12));
-  player.vel = lerp(player.vel, moving ? 1 : 0, 1 - Math.exp(-dt*10)); const ob = player.bob; player.bob += dt*player.vel*8.4;
+  if (player.jy > 0){ player.vy -= 15*dt; player.jy += player.vy*dt; if (player.jy <= 0){ player.jy = 0; player.land = Math.min(1, -player.vy/6); player.vy = 0; } }
+  player.land = Math.max(0, player.land - dt*5); player.spr = lerp(player.spr, sprint && moving ? 1 : 0, 1 - Math.exp(-dt*6));
+  player.vel = lerp(player.vel, moving && player.jy <= 0 ? 1 : 0, 1 - Math.exp(-dt*10)); const ob = player.bob; player.bob += dt*player.vel*8.4*(1 + .35*player.spr);
   if (G.padWorn && Math.floor(player.bob/PI) !== Math.floor(ob/PI) && player.vel > .3) sfx.clack();
   beats(dt); npcs(dt); rowsStep(); world_(dt); particles(dt); hints(dt);
   player.pose = G.aartiT > 0 ? 'aarti' : G.holding === 'pinch' ? 'pinch' : G.holding ? 'hold' : 'rest';
@@ -1189,14 +1196,14 @@ function cameraStep(dt){
   if (G.aartiT > 0){ player.yaw += angDiff(player.yaw, Math.atan2(-(SHRINE.x - player.pos.x), -(SHRINE.z - player.pos.y)))*k; player.pitch = lerp(player.pitch, -.32, k); }
   let bow = 0; if (G.bowT > 0){ G.bowT = Math.max(0, G.bowT - dt); bow = Math.sin((1 - G.bowT/1.3)*PI)*.55; }
   const sh = G.shake; G.shake *= Math.exp(-dt*3);
-  camera.position.set(player.pos.x + (Math.random() - .5)*sh, player.y + player.eye + Math.sin(player.bob)*.03*player.vel, player.pos.y);
+  camera.position.set(player.pos.x + (Math.random() - .5)*sh, player.y + player.eye + player.jy - Math.sin(player.land*Math.PI)*.07 + Math.sin(player.bob)*.03*player.vel, player.pos.y);
   camera.rotation.set(player.pitch - bow, player.yaw, 0);
   if (G.beat === 'lit'){ // a slow crane up and away to see the whole island lit
     const u = ease(clamp(G.beatT/13.5)), P = [G.camFrom.p, new V3(9, 9, -26), new V3(48, 30, 14), new V3(92, 24, 84)], c = new THREE.CatmullRomCurve3(P).getPoint(u);
     const look = new V3(0, 3, -58).lerp(new V3(0, -9, -6), clamp(u*1.4)); camera.position.copy(c);
     const d = look.sub(c), yaw = Math.atan2(-d.x, -d.z), pitch = Math.atan2(d.y, Math.hypot(d.x, d.z));
     const w = clamp(G.beatT/1.2); camera.rotation.set(lerp(G.camFrom.pitch, pitch, w), G.camFrom.yaw + angDiff(G.camFrom.yaw, yaw)*w, 0); }
-  camera.fov = lerp(camera.fov, G.beat === 'lit' ? 64 : 72, k*.5); camera.updateProjectionMatrix();
+  camera.fov = lerp(camera.fov, G.beat === 'lit' ? 64 : 72 + 4*player.spr, k*.5); camera.updateProjectionMatrix();
   const yawL = camera.rotation.y, c = Math.cos(yawL), s = Math.sin(yawL), right = new V3(c, 0, -s), back = new V3(s, 0, c);
   U.uLight.value.set(0, 0, 0).addScaledVector(right, .55).addScaledVector(UP, 1).addScaledVector(back, .3).normalize();
   const showMe = G.beat !== 'lit' && G.beat !== 'shift';
@@ -1211,7 +1218,7 @@ function cameraStep(dt){
 
 /* ---------------- render: color pass, id/depth pass, ink + wobble + grain post-pass (as Govardhan) ---------------- */
 const post = new THREE.ShaderMaterial({
-  uniforms: { tCol: { value: rtCol.texture }, tId: { value: rtId.texture }, uRes: { value: new V2(1, 1) }, uWob: { value: 2.4 }, uGrain: { value: .8 }, uTime: { value: 0 },
+  uniforms: { tCol: { value: rtCol.texture }, tId: { value: rtId.texture }, uRes: { value: new V2(1, 1) }, uWob: { value: 1.8 }, uGrain: { value: .8 }, uTime: { value: 0 },
     uInk: { value: 1.15 }, uFlash: { value: 0 }, uPulse: { value: 0 }, uInkC: { value: hv(INK) }, uGlowC: { value: hv('#f6b93b') } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }`,
   fragmentShader: `precision highp float;
@@ -1334,6 +1341,9 @@ function selftest(){
     startArrive(); ok(G.beat === 'arrive', 'beat 1: the Pushpaka Vimana flies in at dusk');
     ok(run(10, () => G.beat === 'landed'), 'the vimana sets down at the island\'s edge'); ok(G.night > .95, 'night has fallen: Amavasya, sky indigo');
     ok(!!G.dlg && G.dlg.lines[0][0] === 'Sita', 'Sita, Lakshmana and Hanuman speak on landing'); finishDlg(); ok(G.beat === 'bharata', 'beat 2: go to Bharata');
+    { const p0 = player.pos.clone(), y0 = player.yaw; inp.f = 1; run(.4); const walk = player.pos.distanceTo(p0), p1 = player.pos.clone(); inp.run = 1; run(.4); const spr = player.pos.distanceTo(p1); inp.f = inp.run = 0;
+      ok(spr > walk*1.5, `Shift sprints: ${spr.toFixed(1)} m against ${walk.toFixed(1)} m walking`); jump(); let top = 0; run(1.2, () => { top = Math.max(top, player.jy); return false; });
+      ok(top > .5 && top < 1 && player.jy === 0, `Space jumps ${top.toFixed(2)} m and lands`); player.pos.copy(p0); player.yaw = y0; run(.1); }
     player.yaw = 0; inp.f = 1; ok(run(12, () => focusTarget() && focusTarget().label === 'Talk to Bharata'), 'walked off the vimana to Bharata at Nandigram'); inp.f = 0;
     ok(use(), 'E on Bharata opens the talk'); finishDlg(); ok(G.beat === 'padukas', 'Bharata places the padukas');
     ok(run(3, () => G.padT > 1.6), 'padukas set down before you'); look(padG.position); ok(use(), 'E wears the padukas'); ok(H.feet.every(f => f.userData.pad.visible), 'padukas on your feet');

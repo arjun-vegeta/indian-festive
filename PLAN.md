@@ -90,3 +90,62 @@ DESIGN.md still rules. These additions keep the new scenes in the same family:
 - The page runs from `file://` in Chrome with no console errors. Every beat is reachable by its hash state. `#selftest` plays it end to end with the same functions the controls use and prints PASS.
 - Verify with headless Chrome screenshots of each beat (`--use-angle=swiftshader --enable-unsafe-swiftshader`, 1280×800, `--virtual-time-budget`). **Look at them** and fix what reads badly, such as shadows that look like water, walls of flat triangles, or a giant arm filling the screen. Save shots to the session scratchpad, not the repo.
 - No git commits or pushes. Don't edit files you don't own.
+
+---
+
+# Round 2: Holi, Ganesh Chaturthi and Durga Puja (added 2026-11-25)
+
+Three sketch islands become real story islands. They use the same contract as above: one self-contained file, Govardhan's engine copied as the base, the paper transitions, `#from=hub`, "Back to the islands" going to `../index.html#done=<id>`, per-beat hash states, `#selftest`, a NOTES file with "Facts for a practising family to check", the content-care rules, and no commits.
+
+| Festival | Story | You are | id / folder | Owner |
+|---|---|---|---|---|
+| Holi | Prahlad and Holika | Prahlad | `holi-prahlad/` | Holi agent |
+| Ganesh Chaturthi | Ganesha's race round the world | Ganesha | `ganesh-race/` | Ganesh agent |
+| Durga Puja | Durga and Mahishasura | Durga | `durga-mahishasura/` | Durga agent |
+| – | hub: turn these three sketch islands into story islands | the boy | `index.html` | hub agent |
+
+**Lessons from round 1, which apply to every new island:**
+- What you hold must never cover the middle of the screen. The bow on the Rama islands did; keep held things low and to the sides.
+- Speech bubbles must never stack on top of each other. Queue them, or offset each new one.
+- Fire must read as fire: soft-tipped tongue shapes that lick upward and flicker, not rows of spikes.
+
+## Holi · Prahlad and Holika · you are Prahlad (`holi-prahlad/index.html`)
+Hands: a boy at eye height 1.15 m. Skin `SK2`, MUSTARD (yellow) cuffs, and a bracelet of small green tulsi beads. Hands come together in namaste when he prays.
+1. **The palace:** King Hiranyakashipu (a faceless crowned figurine, stern but not frightening) orders everyone to worship only him. Courtiers bow. You, Prahlad, keep saying Vishnu's name: hold F to pray, and ink rings of calm spread out from you as Krishna's flute rings do. The king is angry.
+2. **Holika:** his sister Holika has a shawl that fire cannot burn. She sits with you on a pyre of wood. Fire rises around you. Hold to stay calm, keeping the gold dot in the ring as the fire gusts, using Govardhan's balance mechanic. The shawl lifts off Holika on the wind and wraps round you. When the fire dies down you walk out unharmed. Holika is simply gone: **never show anyone burning.**
+3. **(Optional, one line only):** Vishnu later came as Narasimha to protect Prahlad. Never show the fight.
+4. **The story shifts to today, at night:** the village builds the Holika Dahan bonfire. Walk round it once, and offer new wheat or chana stalks into the fire. People roast the grain. Use the soft flame look.
+5. **The next morning, Holi:** the paper turns bright. Pick colours (gulal) from bowls and throw them (click) at villagers and friends. Flat colour patches stay on the figurines and on the ground, and they throw colours back at you, splashing the screen edges. Add a pichkari water squirt, gujiya sweets and the call "Bura na mano, Holi hai!". Nothing is scored.
+6. **"Why we celebrate Holi"** card: good over evil, and Prahlad's faith; Holika Dahan the night before; spring and the new harvest; Radha and Krishna's colour play in Braj (Lathmar Holi in Barsana); forgiving and starting fresh. Hindi word chips: होली, होलिका दहन, गुलाल, प्रह्लाद.
+
+## Ganesh Chaturthi · Ganesha's race round the world · you are Ganesha (`ganesh-race/index.html`)
+Hands: eye height 1.4 m. Skin is a new warm sindoor-orange triple; pick and list it. Gold armlets and a modak in the right hand. **Your trunk is visible at the bottom middle of the view**, swaying gently as you walk and lifting when you're happy. Keep it small enough that it never blocks the view. Mushak, the mouse, trots beside you.
+1. **Kailash:** a snowy floating island. Shiva and Parvati sit together, faceless. Narada arrives with one special fruit (a mango) that can't be shared. Whoever goes round the whole world three times first wins it. Your brother Kartikeya leaps onto his peacock and flies off. You can watch him circling far away round the other floating islands for the whole beat.
+2. **Try the race:** you set off with Mushak, but the edge of Kailash is far and Mushak is small. A gentle puzzle with escalating hints, from "What is the whole world to you?" to "Your parents are your world" to the exact key. Walk three full rounds (pradakshina) round Shiva and Parvati, with the counter "Rounds N of 3".
+3. **The fruit:** Parvati gives you the mango. Kartikeya lands, surprised, then smiles: "You are wise, brother." Keep it warm; no sulking.
+4. **The story shifts to today:** a street mandal. **Shape your own clay Ganesha** at the potter's (base, belly, head, ears, trunk, each by hold-to-shape, building up the figure). Fold modaks (hold to pleat). Join a small aarti (a bell and a lamp; never scored). Then the procession with dhol-tasha drums and the call "Ganpati Bappa Morya!". Finish with visarjan: carry your clay Ganesha into the water and watch it gently dissolve (eco-friendly clay).
+5. **"Why we celebrate Ganesh Chaturthi"** card: Ganesha removes obstacles and blesses new beginnings; Parvati shaped him (one gentle line, **no beheading**); ten days ending on Anant Chaturdashi; the public festivals Tilak started; clay idols that are kind to rivers. Hindi word chips: गणेश चतुर्थी, मोदक, गणपति बाप्पा मोरया, विसर्जन.
+
+## Durga Puja · Durga and Mahishasura · you are Durga (`durga-mahishasura/index.html`)
+Hands: eye height 1.7 m, or 2.5 m riding the lion. **Ten arms** in first person, fanned on both sides of the view: a warm golden skin triple (pick and list it), red-bordered white sari cuffs (TOMATO on WHITE), white-and-red shakha-pola bangles and gold armlets. Arms fill in as gifts arrive, and must stay out of the middle of the view.
+1. **The gods in trouble:** Mahishasura, a buffalo demon, has a boon that no man or god can defeat him, and he has taken heaven. The gods (faceless figurines in a circle) send out their light. Beams in their colours meet in the middle, and you open your eyes as Durga.
+2. **The gifts:** each god steps up and gives one gift (E), which appears in one of your hands: Shiva's trishul, Vishnu's chakra, Varuna's conch, Agni's spear, Vayu's bow, Indra's vajra and bell, Yama's staff, Brahma's water pot, and a sword and shield. Counter "Gifts N of 10" (a practical counter, not worship). Then Himavan gives you the **lion**: mount it (E), and you move faster and see from higher up.
+3. **Mahishasura:** a huge buffalo-headed faceless figure who shifts shape (buffalo, then lion, then elephant, then a man) each time you face him. For each form, hold to steady and release the trishul using Govardhan's balance mechanic, in a few short rounds. At the end he topples in dust. No blood, and **no beheading**.
+4. **The gods rejoice:** flowers rain down.
+5. **The story shifts to today, a Kolkata Durga Puja pandal:** a bamboo-and-cloth pandal with the pratima of Durga and her children (Lakshmi, Saraswati, Ganesha, Kartikeya), all faceless and respectful. Then:
+   - Play the **dhak** drum in rhythm with the drummers (tap along; nothing is scored).
+   - Join the **dhunuchi** dance, swaying a clay incense burner as smoke curls up.
+   - Offer pushpanjali flowers (never scored).
+   - On Vijaya Dashami, see sindoor khela from a respectful distance.
+   - Join the immersion: carry the pratima to the river with everyone calling "Asche bochor abar hobe!" (it will come again next year).
+6. **"Why we celebrate Durga Puja"** card: Durga's victory over Mahishasura; the nine nights of Navaratri, ending on Vijaya Dashami, the same day as Dussehra (Rama's island is right next door); in Bengal, Durga coming home to her parents with her children; garba and dandiya in Gujarat; golu dolls in the south. Word chips: দুর্গা পূজা (Bengali) and दुर्गा पूजा, नवरात्रि, ঢাক (dhak), সিঁদুর খেলা (sindoor khela). Check the Bengali spellings.
+
+## Hub changes (`index.html`)
+- Turn the Holi, Ganesh Chaturthi and Durga Puja sketch islands into coloured story islands: a preview of each world, a torana gate, a sign (festival in English and Hindi, story, "You are Prahlad / Ganesha / Durga") and "E: Become …". Link them to `holi-prahlad/index.html#from=hub`, `ganesh-race/index.html#from=hub` and `durga-mahishasura/index.html#from=hub`, and accept `#done=holi-prahlad`, `#done=ganesh-race` and `#done=durga-mahishasura`.
+- Previews:
+  - Holi: a bonfire stack and colour splashes on the grass.
+  - Ganesh Chaturthi: a snowy Kailash peak, with a tiny peacock circling the island.
+  - Durga Puja: a pandal and a lion. Keep Durga Puja next to Dussehra, since they fall on the same days.
+- The suggested journey follows the year: Holi, Ganesh Chaturthi, Durga Puja, Dussehra, Diwali, Govardhan. Re-lay the stepping-stone paths so the glowing path follows that order, and update Dadi's intro and her done lines to match. Change the stat to "Stories walked N of 6".
+- Onam, Pongal and Narakasura stay as sketch islands.
+- Keep the Space jump and everything else as they are. Update `hub-NOTES.md` and the hub `#selftest`, which must still pass.
