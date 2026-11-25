@@ -126,6 +126,7 @@
       <li><span class="key">WASD</span>walk, and look around with the mouse</li>
       <li><span class="key">E</span>talk to people and pick things up</li>
       <li><span class="key">Hold</span>hold the left mouse button (or Space) for big things</li>
+      <li><span class="key">Space</span>jump, and hold <span class="key">Shift</span> to run</li>
       <li><span class="key">F</span>play your flute (or the right mouse button)</li>
       <li><span class="key">Esc</span>pause and settings</li>
     </ul>
@@ -141,11 +142,12 @@
       <li><span class="key">WASD</span>walk. Move the mouse to look. If the mouse is not captured, drag to look.</li>
       <li><span class="key">E</span>talk, pick up, offer</li>
       <li><span class="key">Hold</span>left mouse or Space: lift and set down the hill</li>
+      <li><span class="key">Space</span>jump, and hold <span class="key">Shift</span> to run</li>
       <li><span class="key">F</span>or right mouse: play the flute</li>
       <li><span class="key">Mouse</span>while you hold the hill against the wind, keep the gold dot inside the ring</li>
     </ul>
     <div class="sets">
-      <div><label for="sWob">Hand-drawn wobble</label><input id="sWob" type="range" min="0" max="7" step="0.1" value="2.4"></div>
+      <div><label for="sWob">Hand-drawn wobble</label><input id="sWob" type="range" min="0" max="7" step="0.1" value="1.8"></div>
       <div><label for="sGrain">Paper grain</label><input id="sGrain" type="range" min="0" max="1" step="0.05" value="0.8"></div>
       <div><label for="sSens">Mouse speed</label><input id="sSens" type="range" min="0.3" max="2.5" step="0.05" value="1"></div>
       <div><label for="voiceVolume">Voice</label><input id="voiceVolume" type="range" min="0" max="1" step="0.05" value="0.7"></div>
@@ -554,13 +556,13 @@ NPCS.forEach((n, i) => { const k = n.cow ? NPCS.filter(m => m.cow).indexOf(n) : 
   const a = (k + .5)/c*TAU + (n.cow ? .3 : 0), r = n.cow ? 7.4 + (k%2)*1.1 : 4.2 + (k%2)*.7; n.slot = new V2(Math.cos(a)*r, Math.sin(a)*r); });
 
 /* ---------------- state ---------------- */
-const player = { pos: new V2(2.5, 25), yaw: 0, pitch: .04, bob: 0, eye: 1.15, pose: 'rest', vel: 0 };
+const player = { pos: new V2(2.5, 25), yaw: 0, pitch: .04, bob: 0, eye: 1.15, pose: 'rest', vel: 0, jy: 0, vy: 0, land: 0, spr: 0 };
 const G = { beat: 'talk', step: 0, t: 0, storm: 0, stormT: 0, night: 0, rainbow: 0, lift: 0, lower: 0, day: 0, dayT: 0, stuck: 0, talked: {}, carried: 0,
   thanked: 0, flash: 0, boltT: 0, nextBolt: 4, shake: 0, wind: new V2(), bal: new V2(), gust: null, nextGust: 2, gusts: 0, balT: 0, safeN: 0, callT: 3,
   fluteT: 0, noteI: 0, rippleT: 0, relentT: 0, celebrateT: 0, ended: false, paused: false, started: false, hillHome: true, holdingHill: false,
   hillFrom: new V3(), dayLine: 0, beatT: 0, glowing: [], hintShown: 0, objTarget: null, lastObj: '' };
 const inp = { f: 0, b: 0, l: 0, r: 0, hold: false, flute: false, mdx: 0, mdy: 0, e: false };
-const SET = { wob: 2.4, grain: .8, sens: 1 };
+const SET = { wob: 1.8, grain: .8, sens: 1 };
 
 /* ---------------- sound: synthesised flute, rain, wind, thunder, bells ---------------- */
 const festivalAudio = createFestivalAudio('govardhan');
@@ -759,17 +761,17 @@ addEventListener('mousemove', e => { if (locked){ inp.mdx += e.movementX; inp.md
 canvas.addEventListener('touchstart', e => { const t = e.touches[0]; dragging = true; lastX = t.clientX; lastY = t.clientY; }, { passive: true });
 canvas.addEventListener('touchmove', e => { const t = e.touches[0]; inp.mdx += (t.clientX - lastX)*1.4; inp.mdy += (t.clientY - lastY)*1.4; lastX = t.clientX; lastY = t.clientY; }, { passive: true });
 canvas.addEventListener('touchend', () => { dragging = false; });
-const KEYS = { KeyW: 'f', ArrowUp: 'f', KeyS: 'b', ArrowDown: 'b', KeyA: 'l', ArrowLeft: 'l', KeyD: 'r', ArrowRight: 'r' };
+const KEYS = { KeyW: 'f', ArrowUp: 'f', KeyS: 'b', ArrowDown: 'b', KeyA: 'l', ArrowLeft: 'l', KeyD: 'r', ArrowRight: 'r', ShiftLeft: 'run', ShiftRight: 'run' };
 addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; sfx.init();
   if (e.code === 'Escape' || e.code === 'KeyP'){ if (G.started && !G.ended) pauseGame(!G.paused); return; }
   if (!G.started || G.paused) return;
   if (KEYS[e.code]){ inp[KEYS[e.code]] = 1; e.preventDefault(); }
   if (e.code === 'KeyE' || e.code === 'Enter'){ if (G.dlg) advance(); else { const t = focusTarget(); if (t) t.use(); } }
-  if (e.code === 'Space'){ e.preventDefault(); if (G.dlg) advance(); else inp.hold = true; }
+  if (e.code === 'Space'){ e.preventDefault(); if (G.dlg) advance(); else if (holdNow()) inp.hold = true; else if (!e.repeat) jump(); }
   if (e.code === 'KeyF'){ inp.flute = true; } });
 addEventListener('keyup', e => { if (KEYS[e.code]) inp[KEYS[e.code]] = 0; if (e.code === 'Space') inp.hold = false; if (e.code === 'KeyF') inp.flute = false; });
-addEventListener('blur', () => { inp.f = inp.b = inp.l = inp.r = 0; inp.hold = inp.flute = false; dragging = false; });
-function pauseGame(on){ festivalAudio.pause(on); G.paused = on; $('pause').hidden = !on; if (on){ inp.hold = inp.flute = false; inp.f = inp.b = inp.l = inp.r = 0; if (locked) document.exitPointerLock(); } else grab(); }
+addEventListener('blur', () => { inp.f = inp.b = inp.l = inp.r = inp.run = 0; inp.hold = inp.flute = false; dragging = false; });
+function pauseGame(on){ festivalAudio.pause(on); G.paused = on; $('pause').hidden = !on; if (on){ inp.hold = inp.flute = false; inp.f = inp.b = inp.l = inp.r = inp.run = 0; if (locked) document.exitPointerLock(); } else grab(); }
 $('resume').onclick = () => pauseGame(false);
 $('restart').onclick = () => { location.hash = ''; location.reload(); };
 $('again').onclick = () => { location.hash = ''; location.reload(); };
@@ -782,6 +784,9 @@ festivalAudio.bindEffects(sfx.vol);
 /* ---------------- simulation ---------------- */
 const BALANCE_BEATS = ['balance', 'days'];
 function camAuto(){ return G.dlg || ['lift', 'balance', 'days', 'lower', 'finale'].includes(G.beat); }
+// Space holds when lifting or setting down the hill is ready, and jumps (about 0.6 m) otherwise. Shift sprints.
+function holdNow(){ return ['lift', 'lower', 'balance'].includes(G.beat) || (G.beat === 'storm' && G.storm > .6 && hillRho() < 1.3); }
+function jump(){ if (!G.started || G.paused || G.dlg || G.holdingHill || player.jy > 0 || camAuto()) return false; player.vy = 4.6; player.jy = 1e-4; return true; }
 function update(dt){
   G.t += dt; G.beatT += dt;
   const md = { x: inp.mdx*SET.sens, y: inp.mdy*SET.sens }; inp.mdx = inp.mdy = 0;
@@ -790,11 +795,14 @@ function update(dt){
   else if (!camAuto()){ player.yaw -= md.x*.0023; player.pitch = clamp(player.pitch - md.y*.0023, -1.25, 1.3); }
   // walking: a child's quick steps; with the hill on your finger you can barely shuffle
   const slow = G.holdingHill ? .22 : 1, canWalk = !G.dlg && !['lift', 'lower', 'days', 'finale', 'balance'].includes(G.beat);
+  const sprint = !!inp.run && !G.holdingHill && canWalk;
   const mv = new V2((inp.r - inp.l), (inp.b - inp.f)); let moving = false;
-  if (canWalk && mv.lengthSq() > 0){ mv.normalize().multiplyScalar(4.4*slow*dt); const c = Math.cos(player.yaw), s = Math.sin(player.yaw);
+  if (canWalk && mv.lengthSq() > 0){ mv.normalize().multiplyScalar(4.4*slow*(sprint ? 1.7 : 1)*dt); const c = Math.cos(player.yaw), s = Math.sin(player.yaw);
     player.pos.x += mv.x*c + mv.y*s; player.pos.y += -mv.x*s + mv.y*c; moving = true; progressIfCloser(); }
   collide(player.pos, .35);
-  player.vel = lerp(player.vel, moving ? 1 : 0, 1 - Math.exp(-dt*10)); player.bob += dt*player.vel*9;
+  if (player.jy > 0){ player.vy -= 15*dt; player.jy += player.vy*dt; if (player.jy <= 0){ player.jy = 0; player.land = Math.min(1, -player.vy/6); player.vy = 0; } }
+  player.land = Math.max(0, player.land - dt*5); player.spr = lerp(player.spr, sprint && moving ? 1 : 0, 1 - Math.exp(-dt*6));
+  player.vel = lerp(player.vel, moving && player.jy <= 0 ? 1 : 0, 1 - Math.exp(-dt*10)); player.bob += dt*player.vel*9*(1 + .35*player.spr);
   beats(dt); npcs(dt); weather(dt); hillStep(dt); particles(dt); hints(dt);
   // hands
   player.pose = G.holdingHill || G.beat === 'lift' || G.beat === 'lower' && G.lower < .95 ? (inp.flute ? 'liftFlute' : 'lift') : (inp.flute ? 'flute' : 'rest');
@@ -960,9 +968,9 @@ function cameraStep(dt){
   if (G.beat === 'lower') player.pitch = lerp(player.pitch, lerp(.5, .08, ease(G.lower)), k);
   if (G.beat === 'finale'){ player.pitch = lerp(player.pitch, .16, k*.4); player.yaw += angDiff(player.yaw, Math.atan2(-(H0.x - player.pos.x), -(H0.y - player.pos.y)))*k*.3; }
   const sh = G.shake; G.shake *= Math.exp(-dt*3);
-  camera.position.set(player.pos.x + (Math.random() - .5)*sh, player.eye + Math.sin(player.bob)*.035*player.vel + (Math.random() - .5)*sh, player.pos.y);
+  camera.position.set(player.pos.x + (Math.random() - .5)*sh, player.eye + player.jy - Math.sin(player.land*Math.PI)*.07 + Math.sin(player.bob)*.035*player.vel + (Math.random() - .5)*sh, player.pos.y);
   camera.rotation.set(player.pitch + (Math.random() - .5)*sh*.3, player.yaw, 0);
-  camera.fov = lerp(camera.fov, G.beat === 'lift' && inp.hold || G.beat === 'balance' ? 84 : 72, k*.5); camera.updateProjectionMatrix();
+  camera.fov = lerp(camera.fov, G.beat === 'lift' && inp.hold || G.beat === 'balance' ? 84 : 72 + 4*player.spr, k*.5); camera.updateProjectionMatrix();
   // the light turns with you, so the three tones read the same whichever way you look
   const c = Math.cos(player.yaw), s = Math.sin(player.yaw), right = new V3(c, 0, -s), back = new V3(s, 0, c);
   U.uLight.value.set(0, 0, 0).addScaledVector(right, .55).addScaledVector(UP, 1).addScaledVector(back, .3).normalize();
@@ -974,7 +982,7 @@ function cameraStep(dt){
 
 /* ---------------- render: color pass, id/depth pass, ink + wobble + grain post-pass ---------------- */
 const post = new THREE.ShaderMaterial({
-  uniforms: { tCol: { value: rtCol.texture }, tId: { value: rtId.texture }, uRes: { value: new V2(1, 1) }, uWob: { value: 2.4 }, uGrain: { value: .8 }, uTime: { value: 0 },
+  uniforms: { tCol: { value: rtCol.texture }, tId: { value: rtId.texture }, uRes: { value: new V2(1, 1) }, uWob: { value: 1.8 }, uGrain: { value: .8 }, uTime: { value: 0 },
     uInk: { value: 1.15 }, uFlash: { value: 0 }, uPulse: { value: 0 }, uInkC: { value: hv(INK) }, uGlowC: { value: hv('#f6b93b') } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }`,
   fragmentShader: `precision highp float;
@@ -1097,6 +1105,9 @@ async function selftest(){
   const autoBalance = () => { inp.mdx = -G.bal.x/.0042*.35; inp.mdy = -G.bal.y/.0042*.35; };
   try {
     startTalk(); ok(G.beat === 'talk', 'beat 1 starts: talk to Nanda Baba');
+    { const p0 = player.pos.clone(), y0 = player.yaw; inp.f = 1; run(.5); const walk = player.pos.distanceTo(p0), p1 = player.pos.clone(); inp.run = 1; run(.5); const spr = player.pos.distanceTo(p1); inp.f = inp.run = 0;
+      ok(spr > walk*1.5, `Shift sprints: ${spr.toFixed(1)} m against ${walk.toFixed(1)} m walking`); jump(); let top = 0; run(1.2, () => { top = Math.max(top, player.jy); return false; });
+      ok(top > .5 && top < 1 && player.jy === 0, `Space jumps ${top.toFixed(2)} m and lands`); player.pos.copy(p0); player.yaw = y0; run(.1); }
     const near = n => { go(n.pos.x + 1.4, n.pos.y + 1.4); face(npcAt(n)); };
     near(NPC.nanda); ok(use(), 'E on Nanda Baba opens the talk'); finishDlg(); ok(G.step === 1, 'Nanda sends you to ask Vraj');
     near(NPC.subala); ok(use(), 'talk to Subala'); finishDlg(); near(NPC.yashoda); ok(use(), 'talk to Yashoda Maiya'); finishDlg();

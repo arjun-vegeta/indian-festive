@@ -7,7 +7,7 @@ Hand-inked, paper-and-ink festival figures. It started as isometric SVG (`colorf
 1. **Paper, not screen.** The background is paper `#f4efe3` with a fine fractal-noise grain multiplied over everything. The storm turns it to grey paper (`#e3e3dd`) and night to indigo paper.
 2. **Warm ink.** Every part gets an outline in `#2a2118`. Silhouettes are heavy and lines between parts are finer. Never pure black.
 3. **Three flat tones per surface**, from one light: light, mid and dark, picked by `dot(normal, light)`. The thresholds are `hi .45` and `lo -.28`, blended over a narrow band (`w .09`). The light sits to the right, high and a little behind, and turns with the viewer, so tops read light, fronts mid and far sides dark.
-4. **Hand-drawn wobble.** Noise displacement moves fills and lines together. SVG uses `feTurbulence` at `baseFrequency .055`, 2 octaves, `feDisplacementMap` at scale `2.4`. The slider runs 0 to 7. In 3D it's a post-pass UV displacement that re-rolls 4 times a second.
+4. **Hand-drawn wobble.** Noise displacement moves fills and lines together. SVG uses `feTurbulence` at `baseFrequency .055`, 2 octaves, `feDisplacementMap` at scale `2.4`. The slider runs 0 to 7. In 3D it's a post-pass UV displacement that re-rolls 4 times a second, with a default of 1.8, a little calmer than the SVG's 2.4.
 5. **Short flat blue shadows** in `#4f5f9a`, cast along one fixed sun.
 6. **Chunky figurines:** a cone dhoti or kurta, a ball head, a hair cap or turban. Low-poly forms are real meshes, never sprites or billboards.
 7. **Type and UI:** Baloo 2 (500/700/800). Buttons and toasts are paper pills with a `1.7px` ink border, plus a `3px 3px 0` offset ink shadow on the active one. Accent `#f6b93b`, muted text `#8a7f6c`, rules `#dcd3c1`.
