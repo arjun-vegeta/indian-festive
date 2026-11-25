@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
@@ -80,8 +81,21 @@ export async function synthesizeNarration(apiKey: string, request = fetch) {
   return clips;
 }
 
+export function normalizeNarration(audio: Buffer, id: string) {
+  const result = spawnSync('ffmpeg', [
+    '-v', 'error', '-i', 'pipe:0', '-af', 'loudnorm=I=-19:LRA=7:TP=-2',
+    '-ar', '24000', '-ac', '1', '-b:a', '64k', '-f', 'mp3', 'pipe:1',
+  ], { input: audio });
+  if (result.error) throw new Error(`FFmpeg could not normalize ${id}: ${result.error.message}`);
+  if (result.status !== 0 || !result.stdout.length) {
+    throw new Error(`FFmpeg could not normalize ${id}: ${result.stderr.toString().trim()}`);
+  }
+  return result.stdout;
+}
+
 async function main() {
   const clips = await synthesizeNarration(process.env.SARVAM_API_KEY ?? '');
+  for (const [id, audio] of clips) clips.set(id, normalizeNarration(audio, id));
   const directory = new URL('../audio/', import.meta.url);
   const manifest: Record<string, string> = {};
   for (const [id, audio] of clips) {
