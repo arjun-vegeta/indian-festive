@@ -4,6 +4,10 @@ Floating paper islands in a ring, one festival each, in the order they come roun
 
 Built at Festive Hacks 2026 (WeMakeDevs × WeAreDevelopers, Bengaluru). Everything is drawn in one hand-inked, paper-and-ink look.
 
+## Why we built this
+
+Many Gen Z and millennials celebrate these festivals without knowing the stories behind them or why we do the rituals, and kids rarely get to hear them now. Here you play each story as its hero, then see how families celebrate it today. Made for kids first: no scores, no way to fail, and hints when you're stuck.
+
 ![Festive Islands from above](shots/01-overview.jpg)
 
 ## Demo video
