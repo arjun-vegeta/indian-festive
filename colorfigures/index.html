@@ -1,0 +1,722 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Govardhan Hill</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<!--
+  Govardhan: the hill that became an umbrella. Festive Hacks, Bengaluru, Nov 2026 (mockup).
+
+  Every line of drawing code and every piece of art in this file was written for this mockup: no images, no traced art.
+  The look and the way it plays (a hand-inked isometric object you turn round, story buttons in order, a see-through
+  view with name labels, flat three-tone shading, a heavier outer ink line, a flat blue cast shadow and a paper wobble
+  filter) are inspired by Colorfigures by April Zhu, https://april-zhu.com/colorfigures (MIT licence).
+  No Colorfigures code is copied here. The techniques used (orthographic projection with a turning camera, painter's
+  sort with box separation, convex hull silhouettes, an SVG feTurbulence + feDisplacementMap filter) are general ones,
+  written from scratch.
+-->
+<style>
+  :root{--paper:#f4efe3;--ink:#2a2118;--muted:#8a7f6c;--rule:#dcd3c1;--accent:#f6b93b}
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--paper);color:var(--ink);font:16px/1.45 "Baloo 2",ui-rounded,system-ui,-apple-system,sans-serif;
+       display:flex;flex-direction:column;align-items:center;padding:18px 16px 28px;transition:background-color .9s ease;overflow-x:hidden}
+  body.storm{background-color:#e3e3dd}
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.85;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .42  0 0 0 0 .37  0 0 0 0 .3  .13 0 0 0 0'/></filter><rect width='100%' height='100%' filter='url(%23g)'/></svg>")}
+  .wrap{position:relative;z-index:1;width:100%;max-width:1000px}
+  header{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+  h1{font-size:22px;margin:0;font-weight:800;letter-spacing:.01em;line-height:1.2}
+  h1 small{font-weight:500;color:var(--muted);font-size:16px}
+  .tg{display:flex;gap:8px}
+  button{font:inherit;font-weight:700;font-size:15px;color:var(--ink);background:var(--paper);border:1.7px solid var(--ink);border-radius:999px;
+         padding:3px 15px;cursor:pointer;line-height:1.5}
+  button:hover{background:#ece5d4}
+  button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+  button[aria-pressed=true]{background:var(--ink);color:var(--paper)}
+  .stage{display:grid;grid-template-columns:200px 1fr;gap:6px;align-items:start}
+  .actions{display:flex;flex-direction:column;gap:9px;padding-top:10px}
+  .act{text-align:left;display:flex;align-items:center;gap:8px;width:max-content;max-width:100%}
+  .act .n{flex:none;width:21px;height:21px;border-radius:50%;border:1.5px solid currentColor;font-size:12px;line-height:18px;text-align:center}
+  .act.next{background:var(--accent);box-shadow:3px 3px 0 var(--ink);transform:translate(-1px,-1px)}
+  .act.done{opacity:.5}
+  .act.done .n{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .act.again{margin-top:8px;font-size:13px;padding:1px 12px;border-style:dashed}
+  .figbox{position:relative;min-width:0}
+  #fig{width:100%;height:auto;display:block;overflow:visible;cursor:grab;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+  #fig.drag{cursor:grabbing}
+  .stats{position:absolute;top:4px;right:4px;display:flex;flex-direction:column;align-items:flex-end;gap:8px;pointer-events:none}
+  .stat{text-align:right}
+  .stat .k{font-size:11.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .stat .v{font-size:32px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+  .stat .v.bump{animation:bump .4s ease-out}
+  @keyframes bump{0%{transform:scale(1.22)}100%{transform:none}}
+  .toast{position:absolute;left:50%;top:10px;transform:translate(-50%,6px);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;
+         background:#fff1bf;border:1.5px solid var(--ink);border-radius:10px;box-shadow:3px 3px 0 var(--ink);padding:5px 14px;font-weight:700;
+         font-size:15px;max-width:88%;width:max-content;text-align:center;z-index:3}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+  .story{min-height:3.2em;text-align:center;max-width:640px;margin:0 auto 10px;font-size:18px;line-height:1.4}
+  .story b{font-weight:800}
+  .legend{display:none;grid-template-columns:1fr 1fr;gap:3px 10px;margin:0 0 10px;font:700 12px/1.25 ui-monospace,Menlo,monospace;letter-spacing:.02em}
+  .legend.has{display:grid}
+  .legend span{display:flex;align-items:center;gap:6px}
+  .legend b{flex:none;min-width:19px;height:19px;border-radius:999px;border:1.4px solid var(--ink);background:#fff6dc;text-align:center;line-height:16px;font-size:11px}
+  .legend .on b{background:var(--accent)}
+  .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px 28px;border-top:1px solid var(--rule);padding-top:12px}
+  .ctl label{display:block;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:4px}
+  .ctl .row{display:flex;gap:8px;flex-wrap:wrap}
+  input[type=range]{width:100%;accent-color:var(--ink)}
+  footer{font-size:12.5px;color:var(--muted);margin-top:16px;text-align:center;line-height:1.5}
+  footer a{color:inherit}
+  .card{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(42,33,24,.32);z-index:10;padding:16px;
+        animation:fade .35s ease-out}
+  .card[hidden]{display:none}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  .card .in{background:var(--paper);border:2px solid var(--ink);border-radius:18px;box-shadow:6px 6px 0 var(--ink);max-width:560px;width:100%;
+            padding:20px 24px 18px;max-height:92vh;overflow:auto}
+  .card h2{margin:0 0 4px;font-size:24px;line-height:1.2}
+  .card .sub{color:var(--muted);margin:0 0 12px;font-size:15px}
+  .card ul{margin:0 0 12px;padding-left:20px} .card li{margin:0 0 7px}
+  .card .words{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+  .card .w{border:1.5px solid var(--ink);border-radius:10px;padding:3px 10px;background:#fff6dc;font-size:14px;line-height:1.3}
+  .card .w span{display:block;font-size:12px;color:var(--muted)}
+  .card .row{display:flex;gap:10px;justify-content:flex-end}
+  @media (max-width:700px){
+    body{padding:12px 12px 24px}
+    h1{font-size:19px} h1 small{display:block;font-size:14px}
+    .stage{grid-template-columns:1fr}
+    .actions{flex-direction:row;flex-wrap:wrap;gap:7px;padding-top:4px}
+    .act{font-size:13.5px;padding:2px 11px;gap:6px}
+    .act .n{width:18px;height:18px;font-size:11px;line-height:15px}
+    .stats{position:static;flex-direction:row;justify-content:flex-end;gap:18px;margin:2px 0 0}
+    .stat .v{font-size:22px}
+    .story{font-size:16px}
+    button{font-size:14px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Govardhan <small>· the hill that became an umbrella</small></h1>
+    <div class="tg"><button id="xr" aria-pressed="false">See under the hill</button><button id="lbl" aria-pressed="false">Names</button></div>
+  </header>
+  <div class="stage">
+    <div class="actions" id="btns"></div>
+    <div class="figbox">
+      <div class="stats" id="stats"></div>
+      <div class="toast" id="toast" role="status"></div>
+      <svg id="fig" viewBox="-190 -153 380 236" role="img" aria-label="Govardhan hill, the village of Vraj, its people and cows">
+        <defs>
+          <filter id="hand" x="-4%" y="-4%" width="108%" height="108%" color-interpolation-filters="sRGB">
+            <feTurbulence type="fractalNoise" baseFrequency="0.055" numOctaves="2" seed="5" result="warp"/>
+            <feDisplacementMap id="wob" in="SourceGraphic" in2="warp" scale="2.4" xChannelSelector="R" yChannelSelector="G" result="wobbly"/>
+            <feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="2" seed="17" result="grainN"/>
+            <feColorMatrix in="grainN" type="matrix" values=".28 0 0 0 .76  .28 0 0 0 .76  .28 0 0 0 .76  0 0 0 0 1" result="grain"/>
+            <feBlend in="wobbly" in2="grain" mode="multiply" result="tex"/>
+            <feComposite in="tex" in2="wobbly" operator="in"/>
+          </filter>
+          <linearGradient id="rbFadeG" gradientUnits="userSpaceOnUse" x1="0" y1="-153" x2="0" y2="40">
+            <stop offset="0" stop-color="#fff"/><stop offset=".62" stop-color="#fff"/><stop offset="1" stop-color="#000"/>
+          </linearGradient>
+          <mask id="rbFade" maskUnits="userSpaceOnUse" x="-260" y="-200" width="520" height="260"><rect x="-260" y="-200" width="520" height="260" fill="url(#rbFadeG)"/></mask>
+          <radialGradient id="glow"><stop offset="0" stop-color="#ffd76a" stop-opacity=".75"/><stop offset="1" stop-color="#ffd76a" stop-opacity="0"/></radialGradient>
+        </defs>
+        <g id="art" filter="url(#hand)"></g>
+        <g id="labels"></g>
+      </svg>
+      <div class="legend" id="legend"></div>
+    </div>
+  </div>
+  <p class="story" id="story"></p>
+  <div class="controls">
+    <div class="ctl"><label for="wb">Hand-drawn wobble</label><input id="wb" type="range" min="0" max="7" step="0.1" value="2.4"></div>
+    <div class="ctl"><label>View</label><div class="row"><button id="vfront">Front view</button><button id="vspin" aria-pressed="false">Turntable</button></div></div>
+    <div class="ctl"><label>Story</label><div class="row"><button id="restart">Start again</button></div></div>
+  </div>
+  <footer>Drag the picture to turn the village round. Art and code drawn for Festive Hacks 2026.<br>
+    Look and play inspired by <a href="https://april-zhu.com/colorfigures" target="_blank" rel="noopener">Colorfigures</a> by April Zhu (MIT).</footer>
+</div>
+
+<div class="card" id="why" hidden role="dialog" aria-modal="true" aria-labelledby="whyT">
+  <div class="in">
+    <h2 id="whyT">Why we celebrate Govardhan Puja</h2>
+    <p class="sub">The day after Diwali, in many homes across North India</p>
+    <ul>
+      <li>Families shape a small Govardhan hill on the floor (traditionally from cow dung), decorate it with flowers and lamps, and walk around it.</li>
+      <li>Homes and temples cook an <b>Annakut</b>, a "mountain of food", offer it to Krishna and then share it with everyone.</li>
+      <li>It remembers the story you just played: Krishna held up the hill for seven days so that the people and cows of Vraj stayed safe. That is why he is called <b>Giridhari</b>, "the one who holds the mountain".</li>
+      <li>The big idea: say thank you to the land, the rain and the animals that feed us, and keep each other safe in a storm.</li>
+    </ul>
+    <div class="words">
+      <div class="w">गोवर्धन<span>Govardhan, the hill</span></div>
+      <div class="w">अन्नकूट<span>Annakut, mountain of food</span></div>
+      <div class="w">गिरिधारी<span>Giridhari, holder of the hill</span></div>
+      <div class="w">इंद्रधनुष<span>Indradhanush, rainbow</span></div>
+    </div>
+    <div class="row"><button id="whyAgain">Play again</button><button id="whyClose" aria-pressed="true">Close</button></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* =====================================================================================================
+   A tiny hand-inked isometric engine, written for this mockup.
+   World: x east, y north, z up. The camera turns round z (YAW) and looks down at PITCH. Orthographic.
+   ===================================================================================================== */
+const INK = '#2a2118', SHADOW = '#4f5f9a';
+const pal = (l, m, d) => ({ l, m, d });
+const GRASS = pal('#b4d98b', '#93c16c', '#4d7739'), EARTH = pal('#d6b07e', '#b58b58', '#6b4a2a');
+const ROCK = pal('#e7c38f', '#c9a068', '#7c5934'), HILLG = pal('#a3d27b', '#7fb258', '#3e6530');
+const KBLUE = pal('#86a5e3', '#6383c6', '#2e4278'), GOLD = pal('#f7c84a', '#d9a32b', '#6e5015');
+const TOMATO = pal('#ef7157', '#cf5641', '#5a251a'), BLUSH = pal('#f4abc0', '#d98ba2', '#5b2b39');
+const TEAL = pal('#82d0c2', '#5fb2a4', '#204b43'), WHITE = pal('#fbf7ec', '#e3dbca', '#a89d86');
+const INDIGO = pal('#9195e3', '#6e72c6', '#2d306c'), MUSTARD = pal('#f4bf45', '#d59f2a', '#5f4614');
+const SK1 = pal('#e1a87b', '#c48a5e', '#6d4429'), SK2 = pal('#cf9466', '#ae754b', '#5f3b22');
+const HAIR = pal('#4b3a2e', '#32261d', '#1c140e');
+const COW = pal('#fbf6ea', '#e6dcc5', '#a99c80'), COWB = pal('#d09a6a', '#ae774a', '#5b3921');
+const HORN = pal('#efe2c2', '#cdbb92', '#7d6c48');
+const MUD = pal('#ecc791', '#d0a56d', '#7a5833'), THATCH = pal('#f3d980', '#d7b75b', '#806427');
+const CLOUD = pal('#b8bdc8', '#9097a5', '#5c6272'), BARK = pal('#a77a52', '#865c38', '#43301d');
+const LEAF = pal('#9ad17a', '#73b055', '#2f5a25'), TREE = pal('#8fca6d', '#69a84b', '#2d5424');
+const CLAY = pal('#e48e5d', '#c56a3d', '#5f2c16');
+const FOOD = [pal('#f7b04a', '#e08f2a', '#7a4610'), pal('#fbf6e6', '#e8dfc6', '#a99c7c'), pal('#f4a5bd', '#d8839c', '#6b2c3e'),
+              pal('#b9de7a', '#93c256', '#46632a'), pal('#fbd85a', '#e4b733', '#7a5d12')];
+
+/* ---------- camera ---------- */
+let YAW = -35, PITCH = 22, cY = 1, sY = 0, cP = 1, sP = 0, VW = [0, 0, 1], LW = [0, 0, 1], LS = [1, -1];
+const YAW0 = -35, PITCH0 = 22;
+const vlen = a => Math.hypot(a[0], a[1], a[2]) || 1, vnorm = a => { const l = vlen(a); return [a[0]/l, a[1]/l, a[2]/l]; };
+const LC = vnorm([0.55, 0.25, 1]);   // light in the camera's frame: from the right, a little behind, high up
+const P = (x, y, z) => { const a = x*cY - y*sY, b = x*sY + y*cY; return [a, -b*sP - z*cP]; };
+function setCam(yaw, pitch){
+  YAW = yaw; PITCH = Math.max(8, Math.min(40, pitch));
+  const t = YAW*Math.PI/180, q = PITCH*Math.PI/180; cY = Math.cos(t); sY = Math.sin(t); cP = Math.cos(q); sP = Math.sin(q);
+  VW = [-cP*sY, -cP*cY, sP];                                   // unit vector from the scene toward the viewer
+  LW = [LC[0]*cY + LC[1]*sY, -LC[0]*sY + LC[1]*cY, LC[2]];      // the light turns with the viewer, so shading reads the same
+  const a = P(...LW), o = P(0, 0, 0), l = Math.hypot(a[0]-o[0], a[1]-o[1]) || 1; LS = [(a[0]-o[0])/l, (a[1]-o[1])/l];
+}
+setCam(YAW0, PITCH0);
+
+/* ---------- small maths ---------- */
+const sub = (a, b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]], dot = (a, b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+const cross = (a, b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+const avg = ps => { const s = [0, 0, 0]; for (const p of ps){ s[0] += p[0]; s[1] += p[1]; s[2] += p[2]; } return s.map(v => v/ps.length); };
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v)), lerp = (a, b, t) => a + (b - a)*t;
+const lerp2 = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t)];
+const ease = t => t < .5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2)/2;
+const near = p => dot(p, VW), vis = n => dot(n, VW) > 1e-6;
+const R1 = v => Math.round(v*10)/10;
+const hexMix = (a, b, t) => '#' + [1, 3, 5].map(i => Math.round(parseInt(a.substr(i, 2), 16)*(1-t) + parseInt(b.substr(i, 2), 16)*t).toString(16).padStart(2, '0')).join('');
+// three flat tones by how a face meets the light, blended across a narrow band so faces don't snap while turning
+function tone(n, m){ const d = dot(vnorm(n), LW), w = .09, hi = .45, lo = -.28;
+  if (d > hi + w) return m.l; if (d > hi - w) return hexMix(m.m, m.l, (d - hi + w)/(2*w));
+  if (d > lo + w) return m.m; if (d > lo - w) return hexMix(m.d, m.m, (d - lo + w)/(2*w)); return m.d; }
+let seedV = 7; const rnd = () => (seedV = (seedV*16807) % 2147483647) / 2147483647;
+
+/* ---------- SVG primitives (all return strings) ---------- */
+const pd = (pts, close = true) => 'M' + pts.map(p => { const q = P(p[0], p[1], p[2]); return R1(q[0]) + ' ' + R1(q[1]); }).join('L') + (close ? 'Z' : '');
+const sd = pts => 'M' + pts.map(q => R1(q[0]) + ' ' + R1(q[1])).join('L') + 'Z';
+const inkD = (d, w = 1) => `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round"/>`;
+const face = (d, c) => `<path d="${d}" fill="${c}" stroke="${c}" stroke-width=".6" stroke-linejoin="round"/>`;
+function hull2(pts){ pts = pts.slice().sort((a, b) => a[0]-b[0] || a[1]-b[1]); if (pts.length < 3) return pts;
+  const cr = (o, a, b) => (a[0]-o[0])*(b[1]-o[1]) - (a[1]-o[1])*(b[0]-o[0]), lo = [], up = [];
+  for (const p of pts){ while (lo.length > 1 && cr(lo[lo.length-2], lo[lo.length-1], p) <= 0) lo.pop(); lo.push(p); }
+  for (let i = pts.length - 1; i >= 0; i--){ const p = pts[i]; while (up.length > 1 && cr(up[up.length-2], up[up.length-1], p) <= 0) up.pop(); up.push(p); }
+  lo.pop(); up.pop(); return lo.concat(up); }
+const silhouette = (pts3, w = 2) => inkD(sd(hull2(pts3.map(p => P(...p)))), w);
+const ring = (cx, cy, z, rx, ry, n = 16, jit = null, a0 = 0) => Array.from({ length: n }, (_, i) => {
+  const a = a0 + i/n*2*Math.PI, j = jit ? jit(a) : 1; return [cx + rx*j*Math.cos(a), cy + ry*j*Math.sin(a), z]; });
+// faces between two rings of points; colour(n) picks the fill. Only faces turned toward the viewer are drawn.
+function loft(A, B, colour){ let s = ''; const n = A.length, c = avg(A.concat(B));
+  for (let i = 0; i < n; i++){ const a0 = A[i], a1 = A[(i+1)%n], b0 = B[i], b1 = B[(i+1)%n];
+    let nr = cross(sub(b1, a0), sub(b0, a1)); if (vlen(nr) < 1e-9) continue; nr = vnorm(nr);
+    if (dot(nr, sub(avg([a0, a1, b0, b1]), c)) < 0) nr = nr.map(v => -v);
+    if (vis(nr)) s += face(pd([a0, a1, b1, b0]), colour(nr)); }
+  return s; }
+function cone(x, y, z0, z1, r0, r1, m, w = 1.3, n = 14){
+  const A = ring(x, y, z0, r0, r0, n), B = ring(x, y, z1, r1, r1, n);
+  return loft(A, B, nr => tone(nr, m)) + (r1 > .05 && vis([0, 0, 1]) ? face(pd(B), tone([0, 0, 1], m)) + inkD(pd(B), w*.6) : '') + silhouette([...A, ...B], w); }
+function rod(a, b, r, m, w = .9, r1 = r, n = 8){
+  const d = vnorm(sub(b, a)), u = vnorm(cross(d, Math.abs(d[2]) < .9 ? [0, 0, 1] : [1, 0, 0])), v = cross(d, u);
+  const rg = (p, rr) => Array.from({ length: n }, (_, i) => { const t = i/n*2*Math.PI, c = Math.cos(t)*rr, s = Math.sin(t)*rr;
+    return [p[0] + u[0]*c + v[0]*s, p[1] + u[1]*c + v[1]*s, p[2] + u[2]*c + v[2]*s]; });
+  const A = rg(a, r), B = rg(b, r1), end = vis(d) ? B : A, en = vis(d) ? d : d.map(x => -x);
+  return loft(A, B, nr => tone(nr, m)) + face(pd(end), tone(en, m)) + silhouette([...A, ...B], w); }
+// a sphere is a circle in an orthographic view: shade it with nested discs pushed toward the light
+function ball(c, r, m, w = .9){ const [x, y] = P(...c), lx = LS[0], ly = LS[1];
+  return `<circle cx="${R1(x)}" cy="${R1(y)}" r="${R1(r)}" fill="${m.d}"/>`
+    + `<circle cx="${R1(x + lx*r*.13)}" cy="${R1(y + ly*r*.13)}" r="${R1(r*.86)}" fill="${m.m}"/>`
+    + `<circle cx="${R1(x + lx*r*.36)}" cy="${R1(y + ly*r*.36)}" r="${R1(r*.5)}" fill="${m.l}"/>`
+    + (w ? `<circle cx="${R1(x)}" cy="${R1(y)}" r="${R1(r)}" fill="none" stroke="${INK}" stroke-width="${w}"/>` : ''); }
+// an ellipsoid along a heading (cow bodies and heads)
+function blob(c, rx, ry, rz, h, m, w = 1.3){
+  const f = [Math.cos(h), Math.sin(h)], l = [-Math.sin(h), Math.cos(h)], rings = [];
+  for (const ph of [-90, -55, -22, 10, 42, 70, 90]){ const p = ph*Math.PI/180, cr = Math.cos(p), z = c[2] + Math.sin(p)*rz;
+    rings.push(Array.from({ length: 12 }, (_, i) => { const a = i/12*2*Math.PI, u = Math.cos(a)*rx*cr, v = Math.sin(a)*ry*cr;
+      return [c[0] + u*f[0] + v*l[0], c[1] + u*f[1] + v*l[1], z]; })); }
+  let s = ''; for (let i = 0; i < rings.length - 1; i++) s += loft(rings[i], rings[i+1], nr => tone(nr, m));
+  return s + silhouette(rings.flat(), w); }
+const bx = (c, r) => [[c[0]-r, c[1]-r, c[2]-r], [c[0]+r, c[1]+r, c[2]+r]];
+const bxAB = (a, b, r) => [[Math.min(a[0], b[0])-r, Math.min(a[1], b[1])-r, Math.min(a[2], b[2])-r], [Math.max(a[0], b[0])+r, Math.max(a[1], b[1])+r, Math.max(a[2], b[2])+r]];
+const mid = b => [(b[0][0]+b[1][0])/2, (b[0][1]+b[1][1])/2, (b[0][2]+b[1][2])/2];
+// painter's order: if a plane separates two boxes, the one on the viewer's side goes last; otherwise nearer centre last
+function cmp(p, q){ for (const k of [2, 0, 1]){
+    if (p.box[1][k] <= q.box[0][k] + 1e-6) return VW[k] >= 0 ? -1 : 1;
+    if (q.box[1][k] <= p.box[0][k] + 1e-6) return VW[k] >= 0 ? 1 : -1; }
+  return near(mid(p.box)) - near(mid(q.box)); }
+// Topological painter's sort: only pairs that overlap on screen are ordered (by cmp); among items that are free to
+// go next, the farthest goes first. A plain Array.sort with cmp is not transitive and misplaces big parts.
+function byDepth(list){ const it = list.filter(Boolean), n = it.length; if (n < 2) return it.map(i => i.svg).join('');
+  const sb = it.map(o => { let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; const b = o.box;
+    for (const x of [b[0][0], b[1][0]]) for (const y of [b[0][1], b[1][1]]) for (const z of [b[0][2], b[1][2]]){ const q = P(x, y, z);
+      if (q[0] < x0) x0 = q[0]; if (q[0] > x1) x1 = q[0]; if (q[1] < y0) y0 = q[1]; if (q[1] > y1) y1 = q[1]; }
+    return [x0, x1, y0, y1]; });
+  const nr = it.map(o => near(mid(o.box))), outs = Array.from({ length: n }, () => []), indeg = new Array(n).fill(0);
+  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++){ const a = sb[i], b = sb[j];
+    if (a[1] < b[0] || b[1] < a[0] || a[3] < b[2] || b[3] < a[2]) continue;
+    const c = cmp(it[i], it[j]); if (c < 0){ outs[i].push(j); indeg[j]++; } else if (c > 0){ outs[j].push(i); indeg[i]++; } }
+  const done = new Array(n).fill(false), order = [];
+  for (let k = 0; k < n; k++){ let best = -1;
+    for (let i = 0; i < n; i++) if (!done[i] && indeg[i] === 0 && (best < 0 || nr[i] < nr[best])) best = i;
+    if (best < 0) for (let i = 0; i < n; i++) if (!done[i] && (best < 0 || nr[i] < nr[best])) best = i;   // a cycle: break it at the farthest
+    done[best] = true; order.push(it[best].svg); for (const j of outs[best]) indeg[j]--; }
+  return order.join(''); }
+// flat cast shadow on the ground, pushed along the light (kept short so it stays attached)
+const SHLEN = .4;
+const shadowOf = (pts3, z0 = 0) => { const k = SHLEN/LW[2];
+  return `<path d="${sd(hull2(pts3.map(([x, y, z]) => { const h = Math.max(0, z - z0); return P(x - LW[0]*h*k, y - LW[1]*h*k, z0); })))}" fill="${SHADOW}"/>`; };
+
+/* =====================================================================================================
+   The scene: Govardhan hill, the village of Vraj, its people and cows.
+   ===================================================================================================== */
+const BOARD_R = 130, H0 = [0, 38], H1 = [0, -22], HR = [62, 50], HH = 58, LIFT_Z = 26;
+const K0 = [24, -50];                         // where Krishna stands at the start
+const PROF = [[0, 1], [.12, .98], [.28, .92], [.45, .8], [.62, .63], [.77, .44], [.9, .24], [.98, .07]];   // (height, radius) up the hill
+const hillJit = k => a => 1 + .06*Math.sin(3*a + .6) + .04*Math.sin(5*a + 2.1) + .02*Math.sin(9*a + k);
+function hillHeightAt(rho){ if (rho >= 1) return -1;
+  for (let i = 0; i < PROF.length - 1; i++){ const [z0, r0] = PROF[i], [z1, r1] = PROF[i+1];
+    if (rho <= r0 && rho >= r1) return lerp(z0, z1, (r0 - rho)/(r0 - r1)); }
+  return PROF[PROF.length-1][0]; }
+const ACTORS = [
+  { k:'gopa',  home:[-84, -34], hh:-30,  slot:[-28, -30], skin:SK1, low:WHITE,  top:TOMATO, hat:MUSTARD },
+  { k:'gopi',  home:[-46, -98], hh:-70,  slot:[-7, -36],  skin:SK2, low:BLUSH,  top:TEAL },
+  { k:'gopa',  home:[86, -44],  hh:200,  slot:[-50, 6],   skin:SK2, low:WHITE,  top:TEAL,   hat:TOMATO },
+  { k:'gopi',  home:[52, -96],  hh:-120, slot:[12, 26],   skin:SK1, low:INDIGO, top:MUSTARD },
+  { k:'elder', home:[-106, 8],  hh:-10,  slot:[-12, 24],  skin:SK1, low:WHITE,  top:WHITE,  hat:WHITE },
+  { k:'cow',   home:[-62, 82],  hh:-60,  slot:[-36, -14], sh:90,  m:COW },
+  { k:'cow',   home:[94, 44],   hh:200,  slot:[38, 6],    sh:-90, m:COWB },
+  { k:'calf',  home:[104, 12],  hh:160,  slot:[32, -28],  sh:180, m:COW },
+  { k:'cow',   home:[-94, 50],  hh:-30,  slot:[-32, 30],  sh:0,   m:COW },
+];
+const HUTS = [[-96, -64], [100, -8], [-26, 104]];
+const ANNA = [-22, -44];
+const DIYAS = [200, 235, 270, 305, 340].map(a => [ANNA[0] + 25*Math.cos(a*Math.PI/180), ANNA[1] + 25*Math.sin(a*Math.PI/180)]);
+const TUFTS = (() => { const o = []; seedV = 11; while (o.length < 70){ const a = rnd()*2*Math.PI, r = Math.sqrt(rnd())*122; o.push([r*Math.cos(a), r*Math.sin(a)]); } return o; })();
+const DROPS = (() => { const o = []; seedV = 29; for (let i = 0; i < 170; i++){ const a = rnd()*2*Math.PI, r = Math.sqrt(rnd())*126; o.push([r*Math.cos(a), r*Math.sin(a), rnd()]); } return o; })();
+const CLOUDS = [
+  [[-80, 30, 110, 11], [-64, 36, 117, 15], [-48, 30, 112, 12], [-70, 20, 108, 9], [-56, 22, 110, 10]],
+  [[24, 74, 120, 12], [40, 80, 127, 16], [56, 72, 120, 12], [38, 64, 116, 10], [62, 82, 116, 9]],
+  [[-14, 6, 132, 10], [2, 12, 138, 14], [18, 6, 132, 11], [8, -2, 129, 9]],
+  [[80, -12, 104, 9], [92, -4, 109, 11], [102, -14, 104, 8]],
+];
+
+const st = { storm: 0, lift: 0, gather: 0, day: 0, rainbow: 0, anna: 0, diya: 0, phase: 0, xr: false, labels: false,
+             gDir: 1, lDir: 1, busy: false, t: 0 };
+
+function person(p, h, o, raise = 0){
+  const f = [Math.cos(h), Math.sin(h)], l = [-Math.sin(h), Math.cos(h)];
+  const W = (u, v, z) => [p[0] + u*f[0] + v*l[0], p[1] + u*f[1] + v*l[1], z];
+  const parts = [], add = (svg, box) => parts.push({ svg, box });
+  const krishna = o.k === 'krishna', gopi = o.k === 'gopi';
+  for (const v of [1.3, -1.3]){ const c = W(1.4, v, .8); add(ball(c, 1.05, o.skin, .7), bx(c, 1.05)); }
+  add(cone(p[0], p[1], .4, 8.2, gopi ? 3.7 : 3.1, 2.4, o.low, 1.4), [[p[0]-3.6, p[1]-3.6, .4], [p[0]+3.6, p[1]+3.6, 8.2]]);
+  add(cone(p[0], p[1], 8.2, 13.4, 2.4, 2.95, o.top, 1.3), [[p[0]-3, p[1]-3, 8.2], [p[0]+3, p[1]+3, 13.4]]);
+  const head = [p[0], p[1], 16.2];
+  add(ball(head, 2.6, o.skin, 1.1), bx(head, 2.6));
+  if (krishna){
+    add(cone(p[0], p[1], 17.9, 20.6, 1.95, 1.25, GOLD, 1), [[p[0]-2, p[1]-2, 17.9], [p[0]+2, p[1]+2, 20.6]]);
+    const fa = W(-.3, .2, 20.4), fb = W(-1.4, .8, 23.4);
+    add(rod(fa, fb, .28, LEAF, .6) + ball(fb, 1.35, LEAF, .8) + ball(fb, .62, pal('#4b7fd0', '#2f5fae', '#1a3466'), 0), bxAB(fa, fb, 1.4));
+    // a marigold garland round the neck
+    const gr = ring(p[0], p[1], 13.1, 2.7, 2.7, 10).filter(q => vis(sub(q, [p[0], p[1], 13.1])));
+    add(gr.map(q => ball(q, .62, MUSTARD, .4)).join(''), [[p[0]-3, p[1]-3, 12.6], [p[0]+3, p[1]+3, 13.6]]);
+  } else {
+    const hc = W(-.45, 0, 16.6); add(ball(hc, 2.72, HAIR, .9), bx(hc, 2.72));
+    if (gopi){ const bn = W(-2.4, 0, 16.4); add(ball(bn, 1.35, HAIR, .7), bx(bn, 1.35)); }
+    if (o.hat){ add(cone(p[0], p[1], 17.4, 19.4, 2.65, 2.3, o.hat, 1) , [[p[0]-2.7, p[1]-2.7, 17.4], [p[0]+2.7, p[1]+2.7, 19.4]]); }
+  }
+  // arms: the left one (v > 0) is raised when Krishna holds the hill
+  for (const v of [2.95, -2.95]){
+    const sh = W(.35, v, 12.9), up = v > 0 && raise > 0;
+    const hand = up ? W(lerp(.6, .2, raise), lerp(3.4, 2.1, raise), lerp(7.6, 25, raise)) : W(.8, v*1.13, 7.6);
+    add(rod(sh, hand, .82, o.skin, .8) + ball(hand, .95, o.skin, .7), bxAB(sh, hand, 1));
+    if (up && raise > .98){ const tip = [hand[0], hand[1], LIFT_Z + .2]; add(rod(hand, tip, .32, o.skin, .6), bxAB(hand, tip, .4)); }
+  }
+  if (o.k === 'elder'){ const a = W(1.2, -3.6, 0), b = W(1.4, -3.9, 19); add(rod(a, b, .45, BARK, .7), bxAB(a, b, .5)); }
+  const top = krishna ? (raise > .1 ? lerp(23.4, 26, raise) : 23.4) : 19.4;
+  return { svg: byDepth(parts), box: [[p[0]-3.8, p[1]-3.8, 0], [p[0]+3.8, p[1]+3.8, top]],
+           shadow: shadowOf([...ring(p[0], p[1], 0, 3.2, 3.2, 8), [p[0], p[1], 15], ...ring(p[0], p[1], 17, 2.4, 2.4, 6)]), head, top };
+}
+
+function cow(p, h, m, s = .85){
+  const f = [Math.cos(h), Math.sin(h)], l = [-Math.sin(h), Math.cos(h)];
+  const W = (u, v, z) => [p[0] + (u*f[0] + v*l[0])*s, p[1] + (u*f[1] + v*l[1])*s, z*s];
+  const parts = [], add = (svg, box) => parts.push({ svg, box });
+  for (const [u, v] of [[6, 2.4], [6, -2.4], [-6, 2.4], [-6, -2.4]]){ const a = W(u, v, 6.4), b = W(u, v, 0);
+    add(rod(a, b, .95*s, m, .9) + ball(b, .9*s, HAIR, 0), bxAB(a, b, s)); }
+  const bc = W(0, 0, 9.2); add(blob(bc, 9*s, 4.4*s, 4.5*s, h, m, 1.6), [[bc[0]-8*s, bc[1]-8*s, 4.7*s], [bc[0]+8*s, bc[1]+8*s, 13.7*s]]);
+  const hc = W(10.6, 0, 11); add(blob(hc, 3.3*s, 2.3*s, 2.5*s, h, m, 1.2) + ball(W(12.9, 0, 10.2), 1.4*s, pal('#e9b7a6', '#d39684', '#6f3f33'), .7), bx(hc, 3.4*s));
+  for (const v of [1.8, -1.8]){ const a = W(10.4, v, 13), b = W(9.9, v*1.6, 15.4); add(rod(a, b, .45*s, HORN, .6, .2*s, 6), bxAB(a, b, .5));
+    const e = W(9.4, v*2.2, 12); add(ball(e, 1.05*s, m, .6), bx(e, s)); }
+  const ta = W(-8.6, 0, 10.6), tb = W(-9.6, 0, 4.2); add(rod(ta, tb, .32*s, m, .6, .3*s, 6) + ball(tb, .8*s, HAIR, .5), bxAB(ta, tb, .8));
+  const bell = W(8.6, 0, 7.4); add(ball(bell, 1*s, GOLD, .7), bx(bell, s));
+  const all = [W(-10, -4, 0), W(-10, 4, 0), W(14, -4, 0), W(14, 4, 0), W(-9, -4, 13), W(-9, 4, 13), W(12, 0, 15)];
+  const xs = all.map(q => q[0]), ys = all.map(q => q[1]);
+  return { svg: byDepth(parts), box: [[Math.min(...xs), Math.min(...ys), 0], [Math.max(...xs), Math.max(...ys), 15*s]],
+           shadow: shadowOf([W(-9, -3, 0), W(-9, 3, 0), W(13, -2, 0), W(13, 2, 0), W(-8, -3, 12), W(-8, 3, 12), W(11, 0, 13)]), head: hc, top: 15*s };
+}
+
+function hut(c, face0){
+  const [x, y] = c, s = [];
+  s.push(cone(x, y, 0, 9, 11, 11, MUD, 1.8, 18));
+  // door on the wall that looks at the village centre
+  const a0 = face0 - .32, a1 = face0 + .32, dn = [Math.cos(face0), Math.sin(face0), 0];
+  if (vis(dn)){ const arc = (z) => Array.from({ length: 5 }, (_, i) => { const a = lerp(a0, a1, i/4); return [x + 11.08*Math.cos(a), y + 11.08*Math.sin(a), z]; });
+    const pts = [...arc(0), ...arc(6.6).reverse()]; s.push(`<path d="${pd(pts)}" fill="#4a3524"/>` + inkD(pd(pts), .9)); }
+  s.push(cone(x, y, 8.4, 21, 14, .6, THATCH, 2, 18));
+  // thatch lines
+  for (let i = 0; i < 12; i++){ const a = i/12*2*Math.PI, n = [Math.cos(a), Math.sin(a), .8]; if (!vis(n)) continue;
+    s.push(inkD(pd([[x + 13.4*Math.cos(a), y + 13.4*Math.sin(a), 8.9], [x + 4*Math.cos(a), y + 4*Math.sin(a), 18]], false), .6)); }
+  return { svg: s.join(''), box: [[x-14, y-14, 0], [x+14, y+14, 21]], shadow: shadowOf([...ring(x, y, 0, 11, 11, 10), ...ring(x, y, 9, 14, 14, 10), [x, y, 21]]) };
+}
+
+function tree(base, k = 1){ const top = [base[0], base[1], base[2] + 6*k], c1 = [base[0], base[1], base[2] + 9.5*k], c2 = [base[0] + 2.4*k, base[1] - 1.5*k, base[2] + 12*k];
+  return rod(base, top, .9*k, BARK, .8) + ball(c1, 5.2*k, TREE, 1.2) + ball(c2, 3.4*k, TREE, 1); }
+
+function hill(c, z0){
+  const rings = PROF.map(([zh, rr], i) => ring(c[0], c[1], z0 + zh*HH, HR[0]*rr, HR[1]*rr, 40, hillJit(i)));
+  let body = '';
+  for (let i = 0; i < rings.length - 1; i++) body += loft(rings[i], rings[i+1], nr => tone(nr, i < 2 ? ROCK : HILLG));
+  const topR = rings[rings.length-1]; body += face(pd(topR), tone([0, 0, 1], HILLG));
+  // ink where the rock gives way to grass, only along the part of the ring we can see
+  const R2 = rings[2]; for (let j = 0; j < R2.length; j++){ const a = R2[j], b = R2[(j+1)%R2.length], o = rings[3][j];
+    const n = vnorm(cross(sub(b, a), sub(o, a))); const out = dot(n, sub(a, [c[0], c[1], z0])) < 0 ? n.map(v => -v) : n;
+    if (vis(out)) body += inkD(pd([a, b], false), 1); }
+  // rock cracks on the lower band
+  for (let j = 2; j < 40; j += 5){ const a = rings[0][j], b = rings[1][j], n = [Math.cos(j/40*2*Math.PI), Math.sin(j/40*2*Math.PI), .2];
+    if (vis(n)) body += inkD(pd([a, [lerp(a[0], b[0], .55) + 1.5, lerp(a[1], b[1], .55), lerp(a[2], b[2], .55)], b], false), .7); }
+  body += silhouette(rings.flat(), 2.6);
+  if (z0 > .5 && vis([0, 0, -1])) body = face(pd(rings[0]), tone([0, 0, -1], ROCK)) + body;
+  // trees and a marigold garland the people of Vraj gave the hill; the ones on the far side go behind the hill
+  let back = '', front = '';
+  const TREES = [[3, .3, 1], [3, 1.9, .9], [3, 3.6, 1], [4, 5.2, .9], [5, 2.6, .85], [2, 4.6, .8], [6, .9, .8]];
+  for (const [lv, a, k] of TREES){ const r = PROF[lv][1]*.9*hillJit(lv)(a), b = [c[0] + HR[0]*r*Math.cos(a), c[1] + HR[1]*r*Math.sin(a), z0 + PROF[lv][0]*HH - .5];
+    const n = [Math.cos(a)*.6, Math.sin(a)*.6, 1]; (vis(n) ? (front += tree(b, k)) : (back += tree(b, k))); }
+  for (let i = 0; i < 26; i++){ const a = i/26*2*Math.PI, j = hillJit(0)(a)*1.01, q = [c[0] + HR[0]*j*Math.cos(a), c[1] + HR[1]*j*Math.sin(a), z0 + 1.6];
+    const g = ball(q, 1.5, i % 2 ? MUSTARD : TOMATO, .5); vis([Math.cos(a), Math.sin(a), 0]) ? (front += g) : (back += g); }
+  return { svg: back + body + front, rings, box: [[c[0]-HR[0]*1.1, c[1]-HR[1]*1.1, z0], [c[0]+HR[0]*1.1, c[1]+HR[1]*1.1, z0 + HH + 10]] };
+}
+
+function diya(c, lit, t, i){
+  const [x, y] = c, A = ring(x, y, 0, 1.4, 1.4, 12), B = ring(x, y, 1.3, 3, 2.6, 12), Cc = ring(x, y, 2.1, 2.8, 2.4, 12);
+  let s = loft(A, B, n => tone(n, CLAY)) + loft(B, Cc, n => tone(n, CLAY)) + `<path d="${pd(Cc)}" fill="#5b3418"/>` + silhouette([...A, ...B, ...Cc], 1) + inkD(pd(Cc), .7);
+  if (lit > 0){ const [fx, fy] = P(x + 1.6, y, 2.4), fl = 1 + .12*Math.sin(t*9 + i*1.7), hgt = 6*fl*lit;
+    s += `<circle cx="${R1(fx)}" cy="${R1(fy - 3)}" r="${R1(11*lit)}" fill="url(#glow)"/>`
+      + `<path d="M${R1(fx-1.6)} ${R1(fy)}Q${R1(fx-1.8)} ${R1(fy-hgt*.55)} ${R1(fx)} ${R1(fy-hgt)}Q${R1(fx+1.8)} ${R1(fy-hgt*.55)} ${R1(fx+1.6)} ${R1(fy)}Z" fill="#ffc83d" stroke="${INK}" stroke-width=".7"/>`
+      + `<path d="M${R1(fx-.6)} ${R1(fy-.3)}Q${R1(fx-.6)} ${R1(fy-hgt*.4)} ${R1(fx)} ${R1(fy-hgt*.6)}Q${R1(fx+.6)} ${R1(fy-hgt*.4)} ${R1(fx+.6)} ${R1(fy-.3)}Z" fill="#fff3c2"/>`; }
+  return { svg: s, box: [[x-3, y-3, 0], [x+3, y+3, 8]] };
+}
+
+function annakut(n){
+  const [x, y] = ANNA, s = [];
+  const L0 = ring(x, y, 0, 17, 11, 20), L1 = ring(x, y, .9, 17.5, 11.5, 20);
+  s.push({ svg: loft(L0, L1, nr => tone(nr, LEAF)) + face(pd(L1), LEAF.l) + inkD(pd(L1), 1.1) + inkD(pd([[x-15, y, 1], [x+15, y, 1]], false), .6), box: [[x-18, y-12, 0], [x+18, y+12, .9]] });
+  const balls = []; const lay = [[8, 7.2, 0], [6, 4.8, 1], [4, 2.6, 2], [1, 0, 3]]; let k = 0;
+  for (const [cnt, rr, lv] of lay){ if (lv === 0) balls.push([x, y, 3.3]);
+    for (let i = 0; i < cnt; i++){ const a = i/cnt*2*Math.PI + lv*.5; balls.push([x + rr*Math.cos(a)*1.15, y + rr*Math.sin(a)*.95, 3.3 + lv*3.6]); } }
+  const shown = balls.slice(0, Math.floor(n));
+  shown.forEach((b, i) => s.push({ svg: ball(b, 2.9, FOOD[(i*3) % FOOD.length], .9), box: bx(b, 2.9) }));
+  return { svg: byDepth(s), box: [[x-18, y-12, 0], [x+18, y+12, 18]], top: shown.length ? shown[shown.length-1] : [x, y, 1], count: balls.length };
+}
+const ANNA_N = annakut(99).count;
+
+/* ---------- where everyone is, from the story state ---------- */
+function layout(){
+  const L = st.lift, walk = ease(clamp(L/.3)), arm = ease(clamp((L - .25)/.3)), rise = ease(clamp((L - .3)/.32)), glide = ease(clamp((L - .62)/.38));
+  const hc = lerp2(H0, H1, glide), hz = LIFT_Z*rise;
+  const kp = lerp2(K0, H1, walk), kMove = walk > 0 && walk < 1;
+  const kh = kMove ? Math.atan2((H1[1]-K0[1])*st.lDir, (H1[0]-K0[0])*st.lDir) : -Math.PI/2 + .35;
+  const actors = ACTORS.map((a, i) => { const e = ease(clamp((st.gather - i*.055)/(1 - 8*.055)));
+    const slot = [H1[0] + a.slot[0], H1[1] + a.slot[1]], p = lerp2(a.home, slot, e), moving = e > 0 && e < 1;
+    let h = a.hh*Math.PI/180;
+    if (moving) h = Math.atan2((slot[1]-a.home[1])*st.gDir, (slot[0]-a.home[0])*st.gDir);
+    else if (e >= 1) h = a.sh != null ? a.sh*Math.PI/180 : Math.atan2(H1[1]-p[1], H1[0]-p[0]);
+    const bob = moving ? Math.abs(Math.sin(e*40))*.6 : 0;
+    return { a, p, h, e, bob }; });
+  return { hc, hz, rise, kp, kh, arm, actors };
+}
+
+/* ---------- labels (callouts in two columns; numbered badges on a phone) ---------- */
+let LABELS = [];
+function drawLabels(){
+  const g = document.getElementById('labels'), lg = document.getElementById('legend');
+  if (!st.labels){ g.innerHTML = ''; lg.className = 'legend'; lg.innerHTML = ''; return; }
+  const list = LABELS.map(a => ({ ...a, s: a.screen || P(...a.at) }));
+  const narrow = innerWidth <= 700;
+  if (narrow){
+    list.sort((a, b) => a.s[1] - b.s[1]);
+    g.innerHTML = list.map((a, i) => `<g><circle cx="${R1(a.s[0])}" cy="${R1(a.s[1])}" r="10" fill="${a.on ? 'var(--accent)' : '#fff6dc'}" stroke="${INK}" stroke-width="2"/>`
+      + `<text x="${R1(a.s[0])}" y="${R1(a.s[1] + 4.5)}" font-size="12.5" font-weight="800" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" fill="${INK}">${i+1}</text></g>`).join('');
+    lg.className = 'legend has'; lg.innerHTML = list.map((a, i) => `<span class="${a.on ? 'on' : ''}"><b>${i+1}</b>${a.text}</span>`).join('');
+    return; }
+  lg.className = 'legend'; lg.innerHTML = '';
+  const FS = 7, CW = 4.32, GAP = 14.5, X = 112, TOP = -140, BOT = 70, TOPR = -86;
+  // balance the two columns: the left-most half of the anchors goes left, the rest right
+  const pinned = list.filter(a => a.side), free = list.filter(a => !a.side).sort((a, b) => a.s[0] - b.s[0]);
+  const half = Math.ceil((free.length - pinned.length)/2);
+  const left = free.slice(0, Math.max(0, half)), right = free.slice(Math.max(0, half)).concat(pinned);
+  let s = '';
+  for (const [col, side] of [[left, -1], [right, 1]]){
+    const top = side < 0 ? TOP : TOPR;
+    col.sort((a, b) => a.s[1] - b.s[1]); const ys = []; let y = -1e9;
+    for (const a of col){ y = Math.max(a.s[1], y + GAP, top); ys.push(y); }
+    const over = ys.length ? ys[ys.length-1] - BOT : 0;
+    if (over > 0) for (let i = ys.length - 1; i >= 0; i--) ys[i] = Math.min(ys[i] - over, i < ys.length - 1 ? ys[i+1] - GAP : Infinity);
+    col.forEach((a, i) => { const w = a.text.length*CW + 11, h = 12, yy = ys[i], ex = side*X, rx = side < 0 ? Math.max(-189, ex - w) : Math.min(189 - w, ex);
+      s += `<g class="tag${a.on ? ' on' : ''}"><path d="M${R1(a.s[0])} ${R1(a.s[1])}L${R1(ex)} ${R1(yy)}" stroke="${INK}" stroke-width="1" fill="none"/>`
+        + `<circle cx="${R1(a.s[0])}" cy="${R1(a.s[1])}" r="2" fill="${INK}"/>`
+        + `<rect x="${R1(rx)}" y="${R1(yy - h/2)}" width="${R1(w)}" height="${h}" rx="${h/2}" fill="${a.on ? 'var(--accent)' : '#fff6dc'}" stroke="${INK}" stroke-width="1.3"/>`
+        + `<text x="${R1(rx + w/2)}" y="${R1(yy + FS*.36)}" font-size="${FS}" font-weight="800" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" letter-spacing=".03em" fill="${INK}">${a.text}</text></g>`; });
+  }
+  g.innerHTML = s;
+}
+
+/* ---------- one frame ---------- */
+function render(){
+  const Lo = layout(), items = [], shadows = [], t = st.t;
+  LABELS = [];
+  let out = '';
+  // rainbow: Indradhanush, "Indra's bow". It always faces the viewer (as real rainbows do), so it is drawn flat behind the scene
+  if (st.rainbow > .01){ const cols = ['#e8584a', '#f39a3d', '#f6d04d', '#7cc36a', '#5a8fd6', '#8a6cc8'];
+    out += `<g opacity="${R1(st.rainbow*.9*10)/10}" mask="url(#rbFade)">` + cols.map((c, i) => { const r = 180 - i*4.4;
+      return `<path d="M${-r} 40A${r} ${r} 0 0 1 ${r} 40" fill="none" stroke="${c}" stroke-width="4.8"/>`; }).join('') + `</g>`;
+    LABELS.push({ screen: [110, 40 - Math.sqrt(180*180 - 110*110)], text: 'INDRADHANUSH (RAINBOW)', on: true, side: 1 }); }
+  // the board: a round patch of Vraj
+  const BT = ring(0, 0, 0, BOARD_R, BOARD_R, 56), BB = ring(0, 0, -7, BOARD_R, BOARD_R, 56);
+  out += loft(BB, BT, n => tone(n, EARTH)) + face(pd(BT), GRASS.l) + silhouette([...BT, ...BB], 2.6) + inkD(pd(BT), 1.2);
+  // where the hill stood, once it is lifted
+  if (Lo.hz > .3 || Math.hypot(Lo.hc[0]-H0[0], Lo.hc[1]-H0[1]) > .5){ const fp = ring(H0[0], H0[1], 0, HR[0]*.98, HR[1]*.98, 40, hillJit(0));
+    out += `<g opacity="${R1(clamp(Lo.hz/6)*10)/10}"><path d="${pd(fp)}" fill="#cdb07f"/>${inkD(pd(fp), 1.1)}`
+      + [[-20, 10], [14, 22], [30, -4], [-38, 30], [4, 50]].map(([dx, dy]) => ball([H0[0]+dx, H0[1]+dy, .9], 1.6, ROCK, .6)).join('') + `</g>`; }
+  // grass tufts, not under the hill where it sits
+  for (const [x, y] of TUFTS){ const rr = ((x-Lo.hc[0])/HR[0])**2 + ((y-Lo.hc[1])/HR[1])**2; if (Lo.hz < 3 && rr < 1.05) continue;
+    if (((x-H0[0])/HR[0])**2 + ((y-H0[1])/HR[1])**2 < 1 && Lo.hz > 3) continue;
+    const [sx, sy] = P(x, y, 0); out += inkD(`M${R1(sx-1.6)} ${R1(sy)}L${R1(sx-.4)} ${R1(sy-2.4)}M${R1(sx+.2)} ${R1(sy)}L${R1(sx+1.4)} ${R1(sy-2.2)}`, .7); }
+  // huts
+  HUTS.forEach((c, i) => { const hb = hut(c, Math.atan2(-c[1], -c[0])); shadows.push(hb.shadow); items.push(hb); });
+  LABELS.push({ at: [HUTS[0][0], HUTS[0][1], 17], text: 'VRAJ VILLAGE' });
+  // the hill
+  const hl = hill(Lo.hc, Lo.hz);
+  shadows.push(shadowOf(hl.rings.flat()));
+  if (st.xr){ hl.svg = `<g opacity=".38">${hl.svg}</g>`; }
+  items.push(hl);
+  const hTop = [Lo.hc[0] + 10, Lo.hc[1] + 6, Lo.hz + HH*.86];
+  LABELS.push({ at: hTop, text: 'GOVARDHAN HILL', on: st.lift > .3 && st.lift < 1 });
+  // Krishna
+  const kr = person(Lo.kp, Lo.kh, { k: 'krishna', skin: KBLUE, low: GOLD, top: KBLUE }, Lo.arm);
+  shadows.push(kr.shadow); items.push(kr);
+  const holding = st.lift > .99;
+  LABELS.push({ at: [Lo.kp[0], Lo.kp[1], 16.5], text: 'KRISHNA', on: holding && st.storm > .5 });
+  if (Lo.arm > .9) LABELS.push({ at: [Lo.kp[0], Lo.kp[1], LIFT_Z - .5], text: 'LITTLE FINGER', on: holding && st.storm > .5 });
+  // people and cows
+  let firstCow = null, firstGopa = null, firstGopi = null, calf = null;
+  for (const A of Lo.actors){ let it;
+    if (A.a.k === 'cow' || A.a.k === 'calf') it = cow(A.p, A.h, A.a.m, A.a.k === 'calf' ? .58 : .85);
+    else it = person(A.p, A.h, A.a);
+    if (A.bob){ it.svg = `<g transform="translate(0 ${-R1(A.bob)})">${it.svg}</g>`; }
+    shadows.push(it.shadow); items.push(it);
+    const nb = (o) => !o || near(it.head) > near(o.head);
+    if (A.a.k === 'cow' && nb(firstCow)) firstCow = it; if (A.a.k === 'calf') calf = it;
+    if (A.a.k === 'gopa' && nb(firstGopa)) firstGopa = it; if (A.a.k === 'gopi' && nb(firstGopi)) firstGopi = it; }
+  st.safeN = Lo.actors.filter(A => A.e > .999).length;
+  const safe = st.gather > .99 && holding;
+  LABELS.push({ at: firstCow.head, text: 'COWS', on: safe && st.storm > .5 }, { at: calf.head, text: 'CALF', on: safe && st.storm > .5 },
+              { at: firstGopa.head, text: 'GOPAS (COWHERDS)', on: safe && st.storm > .5 }, { at: firstGopi.head, text: 'GOPIS', on: safe && st.storm > .5 });
+  // Annakut and diyas
+  if (st.anna > 0){ const an = annakut(st.anna); items.push(an); shadows.push(shadowOf([...ring(ANNA[0], ANNA[1], 0, 9, 7, 10), [ANNA[0], ANNA[1], 15]]));
+    LABELS.push({ at: an.top, text: 'ANNAKUT', on: st.anna < ANNA_N }); }
+  if (st.anna > 0 || st.diya > 0){ DIYAS.forEach((c, i) => items.push(diya(c, clamp(st.diya*5 - i), t, i)));
+    LABELS.push({ at: [DIYAS[2][0], DIYAS[2][1], 2], text: 'DIYAS (LAMPS)', on: st.diya > .99 }); }
+  // storm clouds
+  if (st.storm > .01){ const k = st.storm;
+    CLOUDS.forEach((cl, ci) => { const dz = (1 - k)*30 + Math.sin(t*.6 + ci)*1.2, dx = Math.sin(t*.25 + ci*2)*3;
+      const pz = cl.map(([x, y, z, r]) => [[x + dx, y, z + dz], r]).sort((a, b) => near(a[0]) - near(b[0]));
+      const outline = pz.map(([c, r]) => { const q = P(...c); return `<circle cx="${R1(q[0])}" cy="${R1(q[1])}" r="${R1(r)}" fill="${INK}" stroke="${INK}" stroke-width="2.8"/>`; }).join('');
+      const fills = pz.map(([c, r]) => ball(c, r, CLOUD, 0)).join('');
+      const xs = cl.map(q => q[0]), ys = cl.map(q => q[1]), zs = cl.map(q => q[2]);
+      items.push({ svg: `<g opacity="${R1(k*10)/10}">${outline}${fills}</g>`, box: [[Math.min(...xs)-12, Math.min(...ys)-12, Math.min(...zs)-12 + dz], [Math.max(...xs)+12, Math.max(...ys)+12, Math.max(...zs)+12 + dz]] }); });
+    LABELS.push({ at: [CLOUDS[1][1][0], CLOUDS[1][1][1], CLOUDS[1][1][2] + (1-k)*30], text: "INDRA'S STORM CLOUDS", on: true });
+    // rain: it stops at the hill, so nobody underneath gets wet
+    const ro = clamp((k - .3)/.7);
+    if (ro > 0) for (const [x, y, ph] of DROPS){ const z = 108 - ((t*150 + ph*108) % 108), rho = Math.sqrt(((x-Lo.hc[0])/HR[0])**2 + ((y-Lo.hc[1])/HR[1])**2);
+      const hh = hillHeightAt(rho); if (hh >= 0 && z < Lo.hz + hh*HH) continue;
+      const a = [x, y, z], b = [x + .9, y + .4, z + 6.5];
+      items.push({ svg: `<path d="${pd([a, b], false)}" stroke="#4f6fb3" stroke-width="1.1" stroke-linecap="round" opacity="${R1(ro*.85*10)/10}"/>`, box: bxAB(a, b, .1) }); }
+  }
+  out += `<clipPath id="bclip"><path d="${pd(BT)}"/></clipPath><g clip-path="url(#bclip)">${shadows.join('')}</g>`;
+  out += byDepth(items);
+  document.getElementById('art').innerHTML = out;
+  drawLabels();
+  drawStats();
+}
+
+/* =====================================================================================================
+   Page: buttons, story text, stats, animation driver, camera drag, hash states for screenshots.
+   ===================================================================================================== */
+const STORY = {
+  start:   'Krishna tells the people of Vraj: this year, let us thank <b>Govardhan hill</b>. Its grass feeds our cows and its streams water our fields.',
+  storm:   '<b>Indra</b>, king of the sky and the rain, is upset. He sends a storm that will not stop.',
+  lifted:  'Little Krishna lifts the whole hill and holds it up on the little finger of his left hand, like a giant umbrella.',
+  shelter: 'Everyone comes under the hill: the gopas, the gopis, the cows and the calves. Nobody gets wet.',
+  days:    'Day {d}. The rain pours for seven days and seven nights, and Krishna does not put the hill down.',
+  rainbow: 'Indra sees that no one is hurt. He stops the rain and is sorry. (In Hindi, a rainbow is called <b>Indradhanush</b>, Indra\'s bow.)',
+  down:    'Krishna puts the hill back in its place, and everyone goes home, safe and dry.',
+  anna:    'To say thank you, the village cooks a <b>mountain of food</b>, the Annakut, and lights lamps around it.',
+};
+const STEPS = [
+  { id: 'storm',   label: "Indra's storm",      run: () => doStorm() },
+  { id: 'lift',    label: 'Lift the hill',      run: () => doLift() },
+  { id: 'shelter', label: 'Shelter everyone',   run: () => doShelter() },
+  { id: 'days',    label: 'Seven days pass',    run: () => doDays() },
+  { id: 'down',    label: 'Set the hill down',  run: () => doDown() },
+  { id: 'anna',    label: 'Offer the Annakut',  run: () => doAnna() },
+  { id: 'why',     label: 'Why we celebrate',   run: () => openWhy() },
+];
+const btns = document.getElementById('btns'), storyEl = document.getElementById('story'), toastEl = document.getElementById('toast');
+STEPS.forEach((s, i) => { const b = document.createElement('button'); b.className = 'act'; b.dataset.i = i;
+  b.innerHTML = `<span class="n">${i+1}</span>${s.label}`; b.onclick = () => { if (st.busy && s.id !== 'why'){ flash('Wait a moment, the story is still moving'); return; } s.run(); }; btns.appendChild(b); });
+function syncButtons(){ [...btns.children].forEach((b, i) => { b.classList.toggle('done', i < st.phase); b.classList.toggle('next', i === st.phase); }); }
+function story(key){ storyEl.innerHTML = STORY[key].replace('{d}', st.day); }
+let flashT = 0;
+function flash(text, ms = 2000){ toastEl.textContent = text; toastEl.classList.add('show'); clearTimeout(flashT); flashT = setTimeout(() => toastEl.classList.remove('show'), ms); }
+const statsEl = document.getElementById('stats'); let statsHTML = '', prevStat = {};
+function drawStats(){ const list = [];
+  if (st.day > 0 && (st.storm > .5 || st.phase === 4)) list.push(['Days of rain', `${st.day} of 7`]);
+  if (st.storm > .5 && st.lift > .99){ list.push(['Dry and safe', `${st.safeN || 0} of 9`]); }
+  const h = list.map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v" data-k="${k}">${v}</div></div>`).join('');
+  if (h !== statsHTML){ statsHTML = h; statsEl.innerHTML = h;
+    statsEl.querySelectorAll('.v').forEach(v => { if (prevStat[v.dataset.k] != null && prevStat[v.dataset.k] !== v.textContent) v.classList.add('bump'); prevStat[v.dataset.k] = v.textContent; }); } }
+
+/* one frame driver for every animation */
+const tweens = new Set(); let raf = 0, fbT = 0, lastT = 0, spin = false;
+function tween(ms, fn, done){ let el = 0; const s = { step(dt){ el += dt*1000; const k = Math.min(1, el/ms); fn(k); if (k >= 1){ tweens.delete(s); if (done) done(); } } }; tweens.add(s); kick(); return s; }
+function frame(){ cancelAnimationFrame(raf); clearTimeout(fbT); raf = 0; fbT = 0;
+  const now = performance.now(), dt = Math.min(.05, Math.max(0, (now - lastT)/1000)); lastT = now; st.t += dt;
+  for (const s of [...tweens]) s.step(dt);
+  if (spin && !drag) setCam(YAW + dt*14, PITCH);
+  render();
+  if (tweens.size || spin || st.storm > .01 || st.diya > 0) schedule(); }
+function schedule(){ raf = requestAnimationFrame(frame); fbT = setTimeout(frame, 70); }
+function kick(){ if (!raf && !fbT){ lastT = performance.now(); schedule(); } }
+const finish = (phase, key) => { st.busy = false; st.phase = Math.max(st.phase, phase); syncButtons(); if (key) story(key); render(); };
+
+function doStorm(){ if (st.storm > .99){ flash('The storm is already here'); return; } if (st.phase > 3){ flash('The storm is over. Press Start again to replay'); return; }
+  st.busy = true; document.body.classList.add('storm'); story('storm');
+  tween(1800, k => { st.storm = Math.max(st.storm, k); }, () => { st.day = 1; finish(1, 'storm'); }); }
+function doLift(){ if (st.storm < .99 && st.phase < 4){ flash('The sky is clear. Start Indra\'s storm first'); return; }
+  if (st.lift > .99){ flash('Krishna is already holding the hill'); return; }
+  st.busy = true; st.lDir = 1; story('lifted'); tween(3600, k => { st.lift = k; }, () => finish(2, 'lifted')); }
+function doShelter(then){ if (st.lift < .99){ flash('Lift the hill first: there is no room under it yet'); return; }
+  if (st.gather > .99){ if (then) then(); else flash('Everyone is already under the hill'); return; }
+  st.busy = true; st.gDir = 1; story('shelter'); tween(3200, k => { st.gather = k; }, () => { finish(3, 'shelter'); if (then) then(); }); }
+function doDays(){ if (st.lift < .99){ flash('Lift the hill first: the village needs shelter'); return; }
+  if (st.day >= 7){ flash('Seven days have passed'); return; }
+  if (st.gather < .99){ doShelter(() => doDays()); return; }
+  st.busy = true;
+  const next = () => { if (st.day < 7){ tween(650, () => {}, () => { st.day++; story('days'); render(); next(); }); }
+    else { document.body.classList.remove('storm');
+      tween(2200, k => { st.storm = 1 - k; st.rainbow = k; }, () => finish(4, 'rainbow')); } };
+  next(); }
+function doDown(){ if (st.storm > .01 && st.day < 7){ flash('Not yet: the rain has not stopped'); return; }
+  if (st.lift < .01){ flash('The hill is already in its place'); return; }
+  st.busy = true; st.gDir = -1; story('down');
+  tween(2600, k => { st.gather = Math.min(st.gather, 1 - k); }, () => { st.lDir = -1;
+    tween(3200, k => { st.lift = 1 - k; }, () => finish(5, 'down')); }); }
+function doAnna(){ if (st.lift > .01){ flash('Set the hill down first'); return; } if (st.phase < 5){ flash('First the storm, then the thank-you: follow the steps in order'); return; }
+  if (st.anna >= ANNA_N){ openWhy(); return; }
+  st.busy = true; story('anna');
+  tween(6500, k => { st.anna = 1 + k*(ANNA_N - 1); st.rainbow = Math.min(st.rainbow, 1 - k); st.diya = clamp((k - .7)/.3); },
+    () => { st.anna = ANNA_N; st.diya = 1; finish(6, 'anna'); setTimeout(openWhy, 1100); }); }
+const why = document.getElementById('why');
+function openWhy(){ why.hidden = false; st.phase = Math.max(st.phase, 7); syncButtons(); document.getElementById('whyClose').focus(); }
+document.getElementById('whyClose').onclick = () => { why.hidden = true; };
+document.getElementById('whyAgain').onclick = () => { why.hidden = true; reset(); };
+why.addEventListener('click', e => { if (e.target === why) why.hidden = true; });
+addEventListener('keydown', e => { if (e.key === 'Escape') why.hidden = true; });
+function reset(){ tweens.clear(); Object.assign(st, { storm: 0, lift: 0, gather: 0, day: 0, rainbow: 0, anna: 0, diya: 0, phase: 0, busy: false, gDir: 1, lDir: 1 });
+  document.body.classList.remove('storm'); story('start'); syncButtons(); render(); }
+document.getElementById('restart').onclick = reset;
+
+/* switches */
+const xrB = document.getElementById('xr'), lblB = document.getElementById('lbl');
+const setXR = v => { st.xr = v; xrB.setAttribute('aria-pressed', v); if (v && !st.labels) setLbl(true); render(); };
+const setLbl = v => { st.labels = v; lblB.setAttribute('aria-pressed', v); render(); };
+xrB.onclick = () => setXR(!st.xr); lblB.onclick = () => setLbl(!st.labels);
+document.getElementById('wb').oninput = e => document.getElementById('wob').setAttribute('scale', e.target.value);
+
+/* camera: drag to turn, double-click or Front view to reset, Turntable spins */
+const svg = document.getElementById('fig'); let drag = null, camTw = null;
+function camTo(y, p, ms = 700){ if (camTw) tweens.delete(camTw); const y0 = YAW, p0 = PITCH, dy = ((y - y0 + 540) % 360) - 180;
+  camTw = tween(ms, k => { const e = ease(k); setCam(y0 + dy*e, p0 + (p - p0)*e); }); }
+svg.addEventListener('pointerdown', e => { if (e.button) return; if (camTw) tweens.delete(camTw); drag = { x: e.clientX, y: e.clientY, yaw: YAW, pitch: PITCH };
+  svg.classList.add('drag'); try { svg.setPointerCapture(e.pointerId); } catch (err) {} });
+svg.addEventListener('pointermove', e => { if (!drag) return; const k = 520/svg.getBoundingClientRect().width;
+  setCam(drag.yaw - (e.clientX - drag.x)*.5*k, drag.pitch + (e.clientY - drag.y)*.3*k); if (!raf) requestAnimationFrame(render); });
+const endDrag = () => { drag = null; svg.classList.remove('drag'); };
+svg.addEventListener('pointerup', endDrag); svg.addEventListener('pointercancel', endDrag);
+svg.addEventListener('dblclick', () => camTo(YAW0, PITCH0));
+const spinB = document.getElementById('vspin');
+document.getElementById('vfront').onclick = () => { spin = false; spinB.setAttribute('aria-pressed', false); camTo(YAW0, PITCH0); };
+spinB.onclick = () => { spin = !spin; spinB.setAttribute('aria-pressed', spin); kick(); };
+addEventListener('keydown', e => { const d = { ArrowLeft: [15, 0], ArrowRight: [-15, 0], ArrowUp: [0, 8], ArrowDown: [0, -8] }[e.key];
+  if (!d || /input|textarea/i.test(e.target.tagName)) return; e.preventDefault(); camTo(YAW + d[0], PITCH + d[1], 260); });
+const fitView = () => svg.setAttribute('viewBox', innerWidth <= 700 ? '-140 -150 280 222' : '-190 -153 380 236');
+addEventListener('resize', () => { fitView(); render(); }); fitView();
+
+/* hash states, so each screen can be opened directly: #start #storm #lifted #sheltered #days #rainbow #down #annakut #why
+   add &xr (see under the hill), &labels, &yaw=200, &pitch=40, e.g. #sheltered&xr&yaw=150 */
+const PRESETS = {
+  start:     { phase: 0, key: 'start' },
+  storm:     { storm: 1, day: 1, phase: 1, key: 'storm' },
+  lifted:    { storm: 1, day: 1, lift: 1, phase: 2, key: 'lifted' },
+  sheltered: { storm: 1, day: 1, lift: 1, gather: 1, phase: 3, key: 'shelter' },
+  days:      { storm: 1, day: 4, lift: 1, gather: 1, phase: 3, key: 'days' },
+  rainbow:   { storm: 0, day: 7, lift: 1, gather: 1, rainbow: 1, phase: 4, key: 'rainbow' },
+  down:      { day: 7, rainbow: 1, phase: 5, key: 'down' },
+  annakut:   { day: 7, anna: ANNA_N, diya: 1, phase: 6, key: 'anna' },
+  why:       { day: 7, anna: ANNA_N, diya: 1, phase: 7, key: 'anna', why: true },
+};
+function applyHash(){ const parts = location.hash.slice(1).split('&').filter(Boolean), name = parts[0] && PRESETS[parts[0]] ? parts[0] : 'start';
+  const p = PRESETS[name]; tweens.clear();
+  Object.assign(st, { storm: 0, lift: 0, gather: 0, day: 0, rainbow: 0, anna: 0, diya: 0, busy: false, gDir: 1, lDir: 1 });
+  for (const k of ['storm', 'lift', 'gather', 'day', 'rainbow', 'anna', 'diya', 'phase']) if (p[k] != null) st[k] = p[k];
+  document.body.classList.toggle('storm', st.storm > .5);
+  let y = YAW0, pt = PITCH0;
+  for (const q of parts.slice(1)){ const [k, v] = q.split('='); if (k === 'yaw') y = +v; if (k === 'pitch') pt = +v; }
+  setCam(y, pt);
+  st.xr = parts.includes('xr'); st.labels = parts.includes('labels') || st.xr;
+  xrB.setAttribute('aria-pressed', st.xr); lblB.setAttribute('aria-pressed', st.labels);
+  why.hidden = !p.why; story(p.key); syncButtons(); render();
+  if (st.storm > .01 || st.diya > 0) kick();
+  // &play=N runs the first N story buttons in order, each after the last one finishes (for demos and test shots)
+  const pl = parts.find(q => q.startsWith('play=')); if (pl){ let i = 0; const n = +pl.split('=')[1];
+    const tick = () => { if (i >= n) return; if (!st.busy){ STEPS[i++].run(); } setTimeout(tick, 120); }; setTimeout(tick, 200); } }
+addEventListener('hashchange', applyHash);
+applyHash();
+</script>
+</body>
+</html>

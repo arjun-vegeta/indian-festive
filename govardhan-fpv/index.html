@@ -1,0 +1,1127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Govardhan, as Krishna</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&display=swap" rel="stylesheet">
+<!--
+  Govardhan, played as young Krishna in first person. Festive Hacks, Bengaluru, 25 Nov 2026 (playable sample).
+
+  The look follows the team's Colorfigures-style Govardhan mockup (../colorfigures/index.html): same palette hex
+  values, the same hill profile and three-tone thresholds, paper, warm-brown ink, grain and wobble. That look is
+  inspired by Colorfigures by April Zhu, https://april-zhu.com/colorfigures (MIT licence, Copyright (c) 2026 April Zhu).
+  No Colorfigures code is copied. Everything here (three.js scene, toon shader, ink/ID post-pass, game) was written
+  for this sample. Every shape is a real 3D mesh built in code: no images, sprites, billboards or textures.
+-->
+<style>
+  :root{--paper:#f4efe3;--ink:#2a2118;--muted:#8a7f6c;--rule:#dcd3c1;--accent:#f6b93b;--note:#fff1bf;--kb:#2e4278}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden;background:var(--paper);color:var(--ink);
+    font:16px/1.4 "Baloo 2",ui-rounded,system-ui,-apple-system,sans-serif}
+  #c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;outline:none}
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:2;overflow:hidden}
+  #obj{position:absolute;top:14px;left:50%;transform:translateX(-50%);background:var(--paper);border:1.7px solid var(--ink);
+    border-radius:999px;box-shadow:3px 3px 0 var(--ink);padding:3px 18px 3px 14px;font-weight:700;font-size:17px;white-space:nowrap;
+    max-width:min(760px,calc(100vw - 32px));overflow:hidden;text-overflow:ellipsis;transition:background-color .4s}
+  #obj .k{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-right:9px;font-weight:800}
+  #obj.new{background:var(--accent)}
+  #obj:empty{display:none}
+  #hint{position:absolute;top:60px;left:50%;transform:translate(-50%,-4px);background:var(--note);border:1.5px solid var(--ink);
+    border-radius:10px;box-shadow:3px 3px 0 var(--ink);padding:4px 14px;font-weight:600;font-size:15px;opacity:0;
+    transition:opacity .4s,transform .4s;max-width:min(620px,calc(100vw - 32px));text-align:center}
+  #hint.show{opacity:1;transform:translate(-50%,0)}
+  #cross{position:absolute;left:50%;top:50%;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;border:2px solid var(--ink);border-radius:50%;
+    background:var(--paper);transition:transform .15s}
+  #cross.on{transform:scale(1.5);background:var(--accent)}
+  #prompt{position:absolute;left:50%;top:calc(50% + 30px);transform:translateX(-50%);display:flex;align-items:center;gap:8px;background:var(--paper);
+    border:1.6px solid var(--ink);border-radius:999px;padding:3px 15px 3px 5px;font-weight:700;font-size:16px;box-shadow:2px 2px 0 var(--ink);
+    opacity:0;transition:opacity .2s;white-space:nowrap}
+  #prompt.show{opacity:1}
+  .key{display:inline-block;min-width:26px;height:26px;border:1.6px solid var(--ink);border-radius:7px;background:var(--accent);text-align:center;
+    line-height:23px;font-size:13.5px;font-weight:800;padding:0 6px;box-shadow:0 2px 0 var(--ink)}
+  #cue{position:absolute;left:50%;top:50%;opacity:0;transition:opacity .5s}
+  #cue.show{opacity:1}
+  #cue svg{position:absolute;left:-17px;top:-17px;overflow:visible}
+  #stats{position:absolute;top:12px;right:18px;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+  .stat{text-align:right;text-shadow:0 0 3px var(--paper),0 0 6px var(--paper),0 0 10px var(--paper)}
+  .stat .k{font-size:11.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .stat .v{font-size:32px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+  .night .stat .k,.night .stat .v{color:var(--paper);text-shadow:0 0 4px var(--ink),0 0 8px var(--ink)}
+  .bub{position:absolute;left:0;top:0;transform:translate(-50%,-100%);background:var(--paper);border:1.6px solid var(--ink);border-radius:12px;
+    box-shadow:2px 2px 0 var(--ink);padding:2px 11px 4px;font-size:15px;font-weight:600;width:max-content;max-width:250px;text-align:center;line-height:1.25;
+    opacity:0;transition:opacity .25s}
+  .bub b{display:block;font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);font-weight:800}
+  .bub.you b{color:var(--kb)}
+  .bub::after{content:"";position:absolute;left:50%;bottom:-7px;width:10px;height:10px;margin-left:-6px;background:var(--paper);
+    border-right:1.6px solid var(--ink);border-bottom:1.6px solid var(--ink);transform:rotate(45deg)}
+  .bub.el::after{left:-6px;top:50%;bottom:auto;margin:-6px 0 0;transform:rotate(135deg)}
+  .bub.er::after{left:auto;right:-7px;top:50%;bottom:auto;margin:-6px 0 0;transform:rotate(-45deg)}
+  .bub.el,.bub.er{background:var(--note)}
+  #dlg{position:absolute;left:50%;bottom:24px;transform:translateX(-50%);width:min(660px,calc(100vw - 32px));background:var(--paper);
+    border:2px solid var(--ink);border-radius:16px;box-shadow:5px 5px 0 var(--ink);padding:10px 18px 8px;display:none;pointer-events:auto}
+  #dlg .who{font-weight:800;font-size:12.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+  #dlg .who.you{color:var(--kb)}
+  #dlg .line{font-size:20px;line-height:1.35;margin:1px 0 4px;font-weight:600}
+  #dlg .more{font-size:12.5px;color:var(--muted);text-align:right;font-weight:700}
+  #bal{position:absolute;left:50%;top:50%;opacity:0;transition:opacity .4s}
+  #bal.show{opacity:1}
+  #bal svg{position:absolute;left:-70px;top:-70px;overflow:visible}
+  #flash{position:absolute;inset:0;pointer-events:none}
+  .card{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(42,33,24,.34);z-index:10;padding:16px}
+  .card[hidden]{display:none}
+  .card .in{background:var(--paper);border:2px solid var(--ink);border-radius:18px;box-shadow:6px 6px 0 var(--ink);max-width:560px;width:100%;
+    padding:20px 24px 18px;max-height:92vh;overflow:auto}
+  .card h2{margin:0 0 2px;font-size:30px;line-height:1.15;font-weight:800}
+  .card .sub{color:var(--muted);margin:0 0 12px;font-size:16px}
+  .card ul{margin:0 0 14px;padding-left:0;list-style:none}
+  .card li{margin:0 0 7px;display:flex;gap:10px;align-items:baseline}
+  .card li .key{flex:none}
+  .card .row{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+  .card .q{font-size:19px;line-height:1.4;margin:6px 0 14px;font-weight:600}
+  .card .cr{font-size:12.5px;color:var(--muted);margin:12px 0 0}
+  .card .cr a{color:inherit}
+  button{font:inherit;font-weight:700;font-size:15px;color:var(--ink);background:var(--paper);border:1.7px solid var(--ink);border-radius:999px;
+    padding:4px 18px;cursor:pointer;line-height:1.5}
+  button:hover{background:#ece5d4}
+  button.go{background:var(--accent);box-shadow:3px 3px 0 var(--ink)}
+  button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+  .sets{display:grid;grid-template-columns:1fr 1fr;gap:10px 22px;border-top:1px solid var(--rule);padding-top:12px;margin:0 0 14px}
+  .sets label{display:block;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:800;margin-bottom:2px}
+  input[type=range]{width:100%;accent-color:var(--ink)}
+  #test{position:fixed;left:12px;bottom:12px;z-index:20;background:var(--paper);border:2px solid var(--ink);border-radius:12px;box-shadow:4px 4px 0 var(--ink);
+    padding:8px 12px;font:600 13px/1.35 ui-monospace,Menlo,monospace;max-width:540px;display:none;white-space:pre-wrap}
+  #fatal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:30;padding:20px;text-align:center;font-size:18px}
+  @media (max-width:700px){ #obj{font-size:14.5px;top:10px} #obj .k{display:none} .stat .v{font-size:22px} #dlg .line{font-size:17px} .sets{grid-template-columns:1fr} }
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
+</head>
+<body>
+<canvas id="c" tabindex="0" aria-label="First-person view of Vraj and Govardhan hill"></canvas>
+<div id="hud">
+  <div id="obj"></div>
+  <div id="hint"></div>
+  <div id="stats"></div>
+  <div id="cross"></div>
+  <div id="cue"><svg width="34" height="34" viewBox="-17 -17 34 34"><g id="cueArrow"><path d="M-6 -11 L8 0 L-6 11 L-2 0 Z" fill="#f6b93b" stroke="#2a2118" stroke-width="2.4" stroke-linejoin="round"/></g></svg></div>
+  <div id="bal"><svg width="140" height="140" viewBox="-70 -70 140 140">
+    <circle r="46" fill="none" stroke="#2a2118" stroke-width="3" stroke-dasharray="7 5"/>
+    <circle r="15" fill="none" stroke="#2a2118" stroke-width="1.6" opacity=".5"/>
+    <g id="balWind" opacity="0"><path d="M-62 -6 L-30 -6 M-58 6 L-36 6" stroke="#2a2118" stroke-width="3" stroke-linecap="round"/><path d="M-34 -14 L-22 0 L-34 14" fill="none" stroke="#2a2118" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>
+    <circle id="balDot" r="9" fill="#f6b93b" stroke="#2a2118" stroke-width="2.6"/>
+  </svg></div>
+  <div id="prompt"></div>
+  <div id="dlg" role="dialog" aria-live="polite"><div class="who" id="dlgWho"></div><div class="line" id="dlgLine"></div><div class="more">E, Space or click to go on</div></div>
+</div>
+
+<div class="card" id="title" hidden>
+  <div class="in">
+    <h2>Govardhan</h2>
+    <p class="sub">You are young Krishna, the cowherd boy of Vraj. Everyone calls you Kanha.</p>
+    <ul>
+      <li><span class="key">WASD</span>walk, and look around with the mouse</li>
+      <li><span class="key">E</span>talk to people and pick things up</li>
+      <li><span class="key">Hold</span>hold the left mouse button (or Space) for big things</li>
+      <li><span class="key">F</span>play your flute (or the right mouse button)</li>
+      <li><span class="key">Esc</span>pause and settings</li>
+    </ul>
+    <div class="row"><button class="go" id="begin">Begin</button></div>
+    <p class="cr">Look inspired by <a href="https://april-zhu.com/colorfigures" target="_blank" rel="noopener">Colorfigures</a> by April Zhu (MIT). Made for Festive Hacks 2026.</p>
+  </div>
+</div>
+<div class="card" id="pause" hidden>
+  <div class="in">
+    <h2>Paused</h2>
+    <ul>
+      <li><span class="key">WASD</span>walk. Move the mouse to look. If the mouse is not captured, drag to look.</li>
+      <li><span class="key">E</span>talk, pick up, offer</li>
+      <li><span class="key">Hold</span>left mouse or Space: lift and set down the hill</li>
+      <li><span class="key">F</span>or right mouse: play the flute</li>
+      <li><span class="key">Mouse</span>while you hold the hill against the wind, keep the gold dot inside the ring</li>
+    </ul>
+    <div class="sets">
+      <div><label for="sWob">Hand-drawn wobble</label><input id="sWob" type="range" min="0" max="7" step="0.1" value="2.4"></div>
+      <div><label for="sGrain">Paper grain</label><input id="sGrain" type="range" min="0" max="1" step="0.05" value="0.8"></div>
+      <div><label for="sSens">Mouse speed</label><input id="sSens" type="range" min="0.3" max="2.5" step="0.05" value="1"></div>
+      <div><label for="sVol">Sound</label><input id="sVol" type="range" min="0" max="1" step="0.05" value="0.7"></div>
+    </div>
+    <div class="row"><button id="restart">Start again</button><button class="go" id="resume">Resume</button></div>
+  </div>
+</div>
+<div class="card" id="end" hidden>
+  <div class="in">
+    <h2>Giridhari</h2>
+    <p class="sub">the one who holds the hill</p>
+    <p class="q" id="endQ">"Every year after Diwali, Vraj will cook a mountain of food for Govardhan, and share it with everyone." <br><span style="color:var(--muted);font-size:15px">Nanda Baba</span></p>
+    <div class="row"><button id="again">Play again</button><button class="go" id="stay">Stay in Vraj</button></div>
+  </div>
+</div>
+<div id="test"></div>
+<div id="fatal"></div>
+
+<script type="module">
+import * as THREE from 'three';
+THREE.ColorManagement.enabled = false;
+
+const $ = id => document.getElementById(id);
+const PI = Math.PI, TAU = PI*2, V3 = THREE.Vector3, V2 = THREE.Vector2;
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v)), lerp = (a, b, t) => a + (b - a)*t;
+const ease = t => t < .5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2)/2, sm = t => t*t*(3 - 2*t);
+const angDiff = (a, b) => { let d = (b - a) % TAU; if (d > PI) d -= TAU; if (d < -PI) d += TAU; return d; };
+let seedV = 7; const rnd = () => (seedV = (seedV*16807) % 2147483647)/2147483647;
+const ERR = []; addEventListener('error', e => ERR.push(String(e.message)));
+
+/* ---------------- palette: hex values from the colorfigures Govardhan mockup ---------------- */
+const pal = (l, m, d) => ({ l, m, d });
+const GRASS = pal('#b4d98b', '#93c16c', '#4d7739'), EARTH = pal('#d6b07e', '#b58b58', '#6b4a2a');
+const ROCK = pal('#e7c38f', '#c9a068', '#7c5934'), HILLG = pal('#a3d27b', '#7fb258', '#3e6530');
+const KBLUE = pal('#86a5e3', '#6383c6', '#2e4278'), GOLD = pal('#f7c84a', '#d9a32b', '#6e5015');
+const TOMATO = pal('#ef7157', '#cf5641', '#5a251a'), BLUSH = pal('#f4abc0', '#d98ba2', '#5b2b39');
+const TEAL = pal('#82d0c2', '#5fb2a4', '#204b43'), WHITE = pal('#fbf7ec', '#e3dbca', '#a89d86');
+const INDIGO = pal('#9195e3', '#6e72c6', '#2d306c'), MUSTARD = pal('#f4bf45', '#d59f2a', '#5f4614');
+const SK1 = pal('#e1a87b', '#c48a5e', '#6d4429'), SK2 = pal('#cf9466', '#ae754b', '#5f3b22');
+const HAIR = pal('#4b3a2e', '#32261d', '#1c140e');
+const COW = pal('#fbf6ea', '#e6dcc5', '#a99c80'), COWB = pal('#d09a6a', '#ae774a', '#5b3921');
+const HORN = pal('#efe2c2', '#cdbb92', '#7d6c48'), MUZZLE = pal('#e9b7a6', '#d39684', '#6f3f33');
+const MUD = pal('#ecc791', '#d0a56d', '#7a5833'), THATCH = pal('#f3d980', '#d7b75b', '#806427');
+const CLOUD = pal('#b8bdc8', '#9097a5', '#5c6272'), BARK = pal('#a77a52', '#865c38', '#43301d');
+const LEAF = pal('#9ad17a', '#73b055', '#2f5a25'), TREE = pal('#8fca6d', '#69a84b', '#2d5424');
+const CLAY = pal('#e48e5d', '#c56a3d', '#5f2c16'), BAMBOO = pal('#f3d980', '#d7b75b', '#806427');
+const FOOD = [pal('#f7b04a', '#e08f2a', '#7a4610'), pal('#fbf6e6', '#e8dfc6', '#a99c7c'), pal('#f4a5bd', '#d8839c', '#6b2c3e'),
+              pal('#b9de7a', '#93c256', '#46632a'), pal('#fbd85a', '#e4b733', '#7a5d12')];
+const INK = '#2a2118', PAPER = '#f4efe3', SHADOW = '#4f5f9a', DOOR = '#4a3524';
+const flatP = h => pal(h, h, h);
+const hv = h => new V3(parseInt(h.slice(1, 3), 16)/255, parseInt(h.slice(3, 5), 16)/255, parseInt(h.slice(5, 7), 16)/255);
+const mixHex = (a, b, t) => hv(a).lerp(hv(b), t);
+
+/* ---------------- renderer, targets ---------------- */
+const canvas = $('c');
+let renderer;
+try { renderer = new THREE.WebGLRenderer({ canvas, antialias: false }); }
+catch (e) { $('fatal').style.display = 'flex'; $('fatal').textContent = 'This game needs WebGL, which this browser could not start.'; throw e; }
+renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(72, 1, .03, 600);
+camera.rotation.order = 'YXZ'; camera.layers.enableAll();
+const rtCol = new THREE.WebGLRenderTarget(4, 4);
+const rtId = new THREE.WebGLRenderTarget(4, 4, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+
+/* ---------------- materials: three flat tones, lit from one side ----------------
+   The light is fixed to the viewer (right, high, a little behind), as in Colorfigures, so every view reads the same:
+   tops light, fronts mid, the far side dark. Bands are hard, with a very narrow blend so they do not shimmer. */
+const U = { uLight: { value: new V3(.5, 1, .2).normalize() }, uAmb: { value: new V3(1, 1, 1) } };
+const TOON_V = `varying vec3 vN; varying vec3 vW;
+void main(){ vec4 w = modelMatrix*vec4(position,1.); vW = w.xyz; vN = normalize(mat3(modelMatrix)*normal); gl_Position = projectionMatrix*viewMatrix*w; }`;
+const TOON_F = `uniform vec3 cL; uniform vec3 cM; uniform vec3 cD; uniform vec3 uLight; uniform vec3 uAmb; uniform float uFlat; uniform float uEmis;
+varying vec3 vN; varying vec3 vW;
+void main(){
+  vec3 n;
+  if (uFlat > .5) n = normalize(cross(dFdx(vW), dFdy(vW)));
+  else { n = normalize(vN); if (!gl_FrontFacing) n = -n; }
+  float d = dot(n, uLight);
+  vec3 c = mix(cD, cM, smoothstep(-.30, -.26, d));
+  c = mix(c, cL, smoothstep(.43, .47, d));
+  c = mix(c*uAmb, c, uEmis);
+  gl_FragColor = vec4(c, 1.);
+}`;
+const matCache = new Map();
+function toon(p, flat = 1, emis = 0, light = null){
+  const k = p.l + p.m + p.d + flat + emis + (light ? 'x' : ''); if (matCache.has(k)) return matCache.get(k);
+  const m = new THREE.ShaderMaterial({ uniforms: { cL: { value: hv(p.l) }, cM: { value: hv(p.m) }, cD: { value: hv(p.d) }, uFlat: { value: flat },
+    uEmis: { value: emis }, uLight: light || U.uLight, uAmb: U.uAmb }, vertexShader: TOON_V, fragmentShader: TOON_F, side: THREE.DoubleSide });
+  matCache.set(k, m); return m;
+}
+// ID + depth pass: every part gets an id; the post-pass inks where ids change or depth folds (like Colorfigures' per-part silhouettes)
+let IDPASS = false, PID = 1;
+const idMat = new THREE.ShaderMaterial({ uniforms: { uId: { value: 0 }, uHl: { value: 0 } }, side: THREE.DoubleSide,
+  vertexShader: `varying float vZ; void main(){ vec4 mv = modelViewMatrix*vec4(position,1.); vZ = -mv.z; gl_Position = projectionMatrix*mv; }`,
+  fragmentShader: `uniform float uId; uniform float uHl; varying float vZ;
+void main(){ float g = floor(uId/256.); float r = uId - g*256.; g += uHl*128.;
+  float dz = clamp(log2(max(vZ, 0.) + 1.)/9., 0., 1.); gl_FragColor = vec4(r/255., g/255., floor(dz*255.)/255., fract(dz*255.)); }` });
+function onBR(){ if (!IDPASS) return; idMat.uniforms.uId.value = this.userData.pid; idMat.uniforms.uHl.value = this.userData.hl ? 1 : 0; idMat.uniformsNeedUpdate = true; }
+// flat cast shadow: each caster's own geometry squashed onto the ground, short, in the Colorfigures shadow blue
+const shadowMat = new THREE.ShaderMaterial({ uniforms: { uSun: { value: new V3(.42, 1, .3).normalize() }, uCol: { value: hv(SHADOW) } },
+  vertexShader: `uniform vec3 uSun; void main(){ vec4 w = modelMatrix*vec4(position,1.); float h = max(w.y, 0.); w.xz -= uSun.xz/uSun.y*h*.42; w.y = .016; gl_Position = projectionMatrix*viewMatrix*w; }`,
+  fragmentShader: `uniform vec3 uCol; void main(){ gl_FragColor = vec4(uCol, 1.); }`, depthWrite: false, side: THREE.DoubleSide,
+  polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+
+/* ---------------- geometry helpers ---------------- */
+const UP = new V3(0, 1, 0), DOWN = new V3(0, -1, 0), _d = new V3(), _q = new THREE.Quaternion(), _v = new V3();
+const GEO = {};
+const sphG = (w = 14, h = 10) => GEO['s' + w + h] || (GEO['s' + w + h] = new THREE.SphereGeometry(1, w, h));
+const ellG = (rx, ry, rz, w = 14, h = 10) => { const g = new THREE.SphereGeometry(1, w, h); g.scale(rx, ry, rz); return g; };
+const rodG = (rt, rb, s = 7) => { const k = 'r' + rt + '_' + rb + '_' + s; return GEO[k] || (GEO[k] = new THREE.CylinderGeometry(rt, rb, 1, s, 1)); };
+const latheG = (pts, s = 14) => new THREE.LatheGeometry(pts.map(([r, y]) => new V2(Math.max(r, 0), y)), s);
+function mk(geo, p, o = {}){
+  const m = new THREE.Mesh(geo, o.mat || toon(p, o.flat ?? 1, o.emis ?? 0));
+  m.userData.pid = o.id ?? PID++; m.onBeforeRender = onBR; if (o.layer) m.layers.set(o.layer); if (o.noShadow) m.userData.noShadow = true;
+  return m;
+}
+function ball(parent, c, r, p, o = {}){ const m = mk(sphG(o.w || 12, o.h || 9), p, { flat: 0, ...o }); m.position.copy(c); m.scale.setScalar(r); parent.add(m); return m; }
+function setRod(m, a, b){ _d.subVectors(b, a); const L = _d.length() || 1e-4; m.position.addVectors(a, b).multiplyScalar(.5); m.quaternion.setFromUnitVectors(UP, _d.divideScalar(L)); m.scale.set(1, L, 1); }
+function rod(parent, a, b, r0, p, o = {}){ const r1 = o.r1 ?? r0; const m = mk(rodG(+r1.toFixed(3), +r0.toFixed(3), o.s || 7), p, o); setRod(m, a, b); parent.add(m); return m; }
+function at(m, x, y, z){ m.position.set(x, y, z); return m; }
+function castShadow(root){ const list = []; root.traverse(o => { if (o.isMesh && !o.userData.noShadow && o.layers.mask === 1) list.push(o); });
+  for (const o of list){ const s = new THREE.Mesh(o.geometry, shadowMat); s.layers.set(1); s.renderOrder = 2; s.userData.noShadow = true; s.frustumCulled = false; o.add(s); } }
+function sameId(root){ const id = PID++; root.traverse(o => { if (o.isMesh) o.userData.pid = id; }); }
+function setHL(root, on){ root.traverse(o => { if (o.isMesh) o.userData.hl = on; }); }
+function ringsGeo(rings, cap){
+  const pos = [], n = rings[0].length, P = v => pos.push(v.x, v.y, v.z);
+  for (let r = 0; r < rings.length - 1; r++) for (let i = 0; i < n; i++){
+    const a = rings[r][i], b = rings[r][(i + 1)%n], c = rings[r + 1][(i + 1)%n], d = rings[r + 1][i]; P(a); P(b); P(c); P(a); P(c); P(d); }
+  if (cap){ const t = rings[rings.length - 1]; for (let i = 0; i < n; i++){ P(t[i]); P(t[(i + 1)%n]); P(cap); } }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); return g;
+}
+
+/* ---------------- the board: a round patch of Vraj on paper ---------------- */
+const BOARD = 72;
+const world = new THREE.Group(); scene.add(world);
+{
+  const top = mk(new THREE.CircleGeometry(BOARD, 96).rotateX(-PI/2), GRASS, { noShadow: true }); world.add(top);
+  const side = mk(new THREE.CylinderGeometry(BOARD, BOARD*.985, 3.5, 96, 1, true), EARTH, { noShadow: true }); side.position.y = -1.75; world.add(side);
+}
+const flatShape = (pts, p, y, o = {}) => { const s = new THREE.Shape(pts.map(([x, z]) => new V2(x, -z))); const g = new THREE.ShapeGeometry(s, 4).rotateX(-PI/2);
+  const m = mk(g, p, { noShadow: true, ...o }); m.position.y = y; world.add(m); return m; };
+const ellPts = (cx, cz, rx, rz, n = 40, j = () => 1) => Array.from({ length: n }, (_, i) => { const a = i/n*TAU, k = j(a); return [cx + rx*k*Math.cos(a), cz + rz*k*Math.sin(a)]; });
+
+/* ---------------- Govardhan hill (profile and jitter from the mockup) ---------------- */
+const HR = [21, 17], HH = 15, BULGE = 1.0, H0 = new V2(0, -38.2);
+const PROF = [[0, 1], [.12, .98], [.28, .92], [.45, .8], [.62, .63], [.77, .44], [.9, .24], [.98, .07]];
+const hillJit = k => a => 1 + .06*Math.sin(3*a + .6) + .04*Math.sin(5*a + 2.1) + .02*Math.sin(9*a + k);
+const hill = { g: new THREE.Group(), pos: new V3(H0.x, 0, H0.y), tilt: new V2(), garland: null };
+{
+  const N = 44, ring = lv => Array.from({ length: N }, (_, i) => { const a = i/N*TAU, j = hillJit(lv)(a), [hz, rr] = PROF[lv];
+    return new V3(HR[0]*rr*j*Math.cos(a), hz*HH, HR[1]*rr*j*Math.sin(a)); });
+  const R = PROF.map((_, i) => ring(i));
+  const rock = mk(ringsGeo(R.slice(0, 3)), ROCK); hill.g.add(rock);
+  const grass = mk(ringsGeo(R.slice(2), new V3(0, HH, 0)), HILLG); hill.g.add(grass);
+  // underside: what you see when it is over your head. Rough rock that bulges down to meet one small finger.
+  seedV = 41;
+  const UF = [1, .82, .62, .42, .24, .1];
+  const under = UF.map((f, k) => Array.from({ length: N }, (_, i) => { const a = i/N*TAU, j = hillJit(0)(a);
+    const y = k === 0 ? 0 : -BULGE*(1 - Math.pow(f, .55)) - (k < 5 ? rnd()*.55 : 0);
+    const ff = k === 0 ? 1 : f*(1 + (rnd() - .5)*.08); return new V3(HR[0]*ff*j*Math.cos(a), y, HR[1]*ff*j*Math.sin(a)); }));
+  // nothing lights a hill's belly from above, so it gets its own low light from the open rim: same three tones, rock still reads
+  const UL = { value: new V3(.8, -.45, .6).normalize() };
+  hill.g.add(mk(ringsGeo(under, new V3(0, -BULGE, 0)), EARTH, { mat: toon(EARTH, 1, 0, UL) }));
+  hill.g.add(mk(latheG([[0, -BULGE - .08], [.3, -BULGE + .02], [.55, -BULGE + .32], [0, -BULGE + .32]], 8), ROCK, { mat: toon(ROCK, 1, 0, UL) }));
+  for (let i = 0; i < 26; i++){ const a = rnd()*TAU, f = .25 + rnd()*.6, x = HR[0]*f*Math.cos(a), z = HR[1]*f*Math.sin(a), y = -BULGE*(1 - Math.pow(f, .55)) - .15;
+    if (i < 14) rod(hill.g, new V3(x, y + .1, z), new V3(x + (rnd() - .5)*.5, y - .5 - rnd()*.8, z + (rnd() - .5)*.5), .06, BARK, { r1: .015, noShadow: true, mat: toon(BARK, 1, 0, UL) });
+    else ball(hill.g, new V3(x, y - .15, z), .35 + rnd()*.45, ROCK, { flat: 1, w: 6, h: 4, noShadow: true, mat: toon(ROCK, 1, 0, UL) }); }
+  // trees on the slopes, as in the mockup
+  for (const [lv, a, k] of [[3, .3, 1], [3, 1.9, .9], [3, 3.6, 1], [4, 5.2, .9], [5, 2.6, .85], [2, 4.6, .8], [6, .9, .8], [4, 1.2, .9], [3, 5.6, 1], [5, 4.3, .9], [2, 2.6, .85], [6, 3.4, .8]]){
+    const r = PROF[lv][1]*.9*hillJit(lv)(a), t = tree(k*1.6); t.position.set(HR[0]*r*Math.cos(a), PROF[lv][0]*HH - .3, HR[1]*r*Math.sin(a)); hill.g.add(t); }
+  // the marigold garland Vraj gives the hill (shown after the offering)
+  const gar = new THREE.Group(); hill.garland = gar; gar.visible = false; hill.g.add(gar);
+  for (let i = 0; i < 52; i++){ const a = i/52*TAU, j = hillJit(0)(a)*1.0; ball(gar, new V3(HR[0]*j*Math.cos(a), .9 + .12*Math.sin(i*1.3), HR[1]*j*Math.sin(a)), .36, i%2 ? MUSTARD : TOMATO, { noShadow: true }); }
+  hill.g.position.copy(hill.pos); world.add(hill.g); castShadow(hill.g);
+}
+const hillHeight = rho => rho >= 1 ? -1 : HH*Math.pow(Math.max(0, 1 - rho*rho), .8);
+// where the hill stood (seen once it is lifted)
+flatShape(ellPts(H0.x, H0.y, HR[0]*.97, HR[1]*.97, 44, hillJit(0)), EARTH, .006);
+
+/* ---------------- props ---------------- */
+function tree(k = 1){ const g = new THREE.Group();
+  rod(g, new V3(0, 0, 0), new V3(0, 1.9*k, 0), .2*k, BARK, { r1: .15*k });
+  ball(g, new V3(0, 2.9*k, 0), 1.45*k, TREE); ball(g, new V3(.7*k, 3.6*k, -.35*k), .95*k, TREE); return g; }
+function hut(x, z){ const g = new THREE.Group();
+  g.add(mk(latheG([[0, 0], [2.1, 0], [2.1, 1.95], [0, 1.95]], 16), MUD));
+  g.add(mk(latheG([[0, 1.78], [2.95, 1.78], [.12, 4.35], [0, 4.35]], 16), THATCH));
+  for (let i = 0; i < 12; i++){ const a = i/12*TAU; rod(g, new V3(2.98*Math.cos(a), 1.79, 2.98*Math.sin(a)), new V3(.5*Math.cos(a), 4.05, .5*Math.sin(a)), .025, flatP(INK), { noShadow: true }); }
+  const face = Math.atan2(6 - z, 0 - x), door = mk(new THREE.BoxGeometry(.95, 1.45, .14), flatP(DOOR), { noShadow: true });
+  door.position.set(2.08*Math.cos(face), .73, 2.08*Math.sin(face)); door.rotation.y = -face + PI/2; g.add(door);
+  g.position.set(x, 0, z); world.add(g); castShadow(g); return g; }
+function pot(parent, x, y, z, k, p = CLAY){ const m = mk(latheG([[0, 0], [.18*k, 0], [.3*k, .18*k], [.26*k, .36*k], [.14*k, .44*k], [.17*k, .5*k], [0, .5*k]], 12), p); m.position.set(x, y, z); parent.add(m); return m; }
+function diya(parent, x, y, z){ const g = new THREE.Group(); g.position.set(x, y, z);
+  g.add(mk(latheG([[0, 0], [.07, 0], [.15, .07], [.13, .1], [0, .08]], 10), CLAY));
+  const fl = mk(latheG([[0, 0], [.05, .03], [.04, .1], [0, .2]], 8), flatP('#ffc83d'), { emis: 1, noShadow: true }); fl.position.set(.05, .08, 0); g.add(fl);
+  const fi = mk(latheG([[0, 0], [.022, .02], [0, .1]], 6), flatP('#fff3c2'), { emis: 1, noShadow: true }); fi.position.set(.05, .09, .02); g.add(fi);
+  g.userData.flame = [fl, fi]; parent.add(g); return g; }
+
+/* ---------------- people and cows (proportions from the mockup's figurines) ---------------- */
+function person(d){
+  const g = new THREE.Group(), s = d.scale || 1, gopi = d.kind === 'gopi'; g.scale.setScalar(s);
+  for (const x of [.11, -.11]) ball(g, new V3(x, .07, .1), .085, d.skin);
+  g.add(mk(latheG([[0, .03], [gopi ? .34 : .27, .03], [.21, .71], [0, .71]], 14), d.low));
+  g.add(mk(latheG([[0, .71], [.21, .71], [.255, 1.16], [0, 1.16]], 14), d.top));
+  const head = ball(g, new V3(0, 1.4, 0), .225, d.skin);
+  ball(g, new V3(0, 1.45, -.045), .232, d.veil ? WHITE : HAIR);
+  if (gopi && !d.veil) ball(g, new V3(0, 1.43, -.25), .11, HAIR);
+  if (d.beard) ball(g, new V3(0, 1.3, .13), .13, WHITE);
+  if (d.hat) g.add(mk(latheG([[0, 1.53], [.24, 1.53], [.21, 1.7], [0, 1.7]], 12), d.hat));
+  if (d.staff) rod(g, new V3(.42, 0, .16), new V3(.44, 1.82, .16), .035, BARK);
+  const arms = {};
+  for (const side of [1, -1]){ const pv = new THREE.Group(); pv.position.set(side*.29, 1.12, 0); g.add(pv);
+    rod(pv, new V3(0, 0, 0), new V3(0, -.43, 0), .075, d.skin); ball(pv, new V3(0, -.47, 0), .085, d.skin);
+    pv.quaternion.setFromUnitVectors(DOWN, new V3(side*.18, -1, .05).normalize()); arms[side] = pv; }
+  castShadow(g); world.add(g);
+  return { g, arms, head, top: 1.78*s, s };
+}
+function cowMesh(d){
+  const g = new THREE.Group(), s = d.calf ? .62 : 1, m = d.m; g.scale.setScalar(s);
+  for (const [x, z] of [[.2, .48], [-.2, .48], [.2, -.48], [-.2, -.48]]){ rod(g, new V3(x, .6, z), new V3(x, .05, z), .075, m); ball(g, new V3(x, .05, z), .08, HAIR); }
+  const body = mk(ellG(.36, .35, .76), m, { flat: 0 }); body.position.set(0, .82, 0); g.add(body);
+  const head = mk(ellG(.2, .21, .3), m, { flat: 0 }); head.position.set(0, 1.02, .82); head.rotation.x = .35; g.add(head);
+  ball(g, new V3(0, .9, 1.06), .13, MUZZLE);
+  for (const x of [.12, -.12]){ rod(g, new V3(x, 1.18, .78), new V3(x*2, 1.36, .7), .045, HORN, { r1: .015 }); ball(g, new V3(x*1.85, 1.07, .72), .085, m); }
+  rod(g, new V3(0, .98, -.72), new V3(0, .45, -.84), .03, m); ball(g, new V3(0, .43, -.84), .07, HAIR);
+  ball(g, new V3(0, .66, .66), .075, GOLD);
+  castShadow(g); world.add(g);
+  return { g, arms: null, head, top: 1.45*s, s };
+}
+
+/* ---------------- Vraj: huts, trees, the Indra altar, a stream, fields ---------------- */
+const HUTS = [[-8, 18], [12, 15], [-15, 1], [14.5, -1], [-23, -15], [23, -16], [-24, 12], [26, 8]];
+HUTS.forEach(([x, z]) => hut(x, z));
+seedV = 3;
+const TREES = [];
+for (let i = 0; i < 46; i++){ const a = rnd()*TAU, r = 44 + rnd()*24, x = r*Math.cos(a), z = r*Math.sin(a); const t = tree(.9 + rnd()*.7); t.position.set(x, 0, z); world.add(t); castShadow(t); TREES.push(t); }
+for (const [x, z, k] of [[-4, 26, 1.1], [18, 22, 1], [-18, 22, .95], [6, -6, .9], [-30, -2, 1.1], [30, -2, 1], [-14, -20, 1], [15, -21, .95], [32, -28, 1.2], [-33, -30, 1.1]]){
+  const t = tree(k); t.position.set(x, 0, z); world.add(t); castShadow(t); }
+// Nanda Baba's altar for the Indra yajna
+const altar = new THREE.Group(); altar.position.set(-1, 0, 4); world.add(altar);
+altar.add(at(mk(new THREE.BoxGeometry(2.6, .45, 2.6), EARTH), 0, .225, 0));
+pot(altar, -.7, .45, -.6, 1); pot(altar, .7, .45, -.5, 1.2, MUD); pot(altar, -.5, .45, .6, .8);
+for (let i = 0; i < 5; i++) rod(altar, new V3(.2 + i*.12, .5, .3), new V3(.9 + i*.08, .58, .95), .05, BARK);
+castShadow(altar);
+// the stream that runs down from Govardhan to water the fields, and a pond
+const streamPts = [[3, -20.5], [6, -15], [9, -10], [12, -6], [17, -3], [20, 2]];
+{ const L = [], R = []; streamPts.forEach((p, i) => { const q = streamPts[Math.min(i + 1, streamPts.length - 1)], o = streamPts[Math.max(i - 1, 0)];
+    const dx = q[0] - o[0], dz = q[1] - o[1], l = Math.hypot(dx, dz) || 1, w = .7 + i*.08; L.push([p[0] - dz/l*w, p[1] + dx/l*w]); R.unshift([p[0] + dz/l*w, p[1] - dx/l*w]); });
+  flatShape(L.concat(R), TEAL, .01); flatShape(ellPts(21, 4.5, 3.6, 2.6, 28), TEAL, .011); }
+flatShape(ellPts(0, 8, 9, 7.5, 36, a => 1 + .05*Math.sin(3*a)), MUD, .005);
+for (const [x, z] of [[-30, 22], [-36, 8], [30, 24]]){ flatShape([[x - 4, z - 3], [x + 4, z - 3], [x + 4, z + 3], [x - 4, z + 3]], LEAF, .008);
+  for (let r = -2; r <= 2; r++) rod(world, new V3(x - 3.6, .02, z + r*1.1), new V3(x + 3.6, .02, z + r*1.1), .03, flatP(INK), { noShadow: true, layer: 1 }); }
+// grass tufts: little ink ticks, as in the mockup
+{ const pos = []; seedV = 11; let n = 0;
+  while (n < 1400){ const a = rnd()*TAU, r = Math.sqrt(rnd())*(BOARD - 2), x = r*Math.cos(a), z = r*Math.sin(a);
+    if (((x - H0.x)/HR[0])**2 + ((z - H0.y)/HR[1])**2 < 1.05) continue; n++;
+    const s = .14 + rnd()*.08, h = rnd()*TAU, cx = Math.cos(h)*s, cz = Math.sin(h)*s;
+    for (const o of [-.6, .5]) pos.push(x + cx*o - .02, 0, z + cz*o, x + cx*o + .03, 0, z + cz*o, x + cx*(o + .35), s*1.5, z + cz*(o + .35)); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+  world.add(mk(g, flatP(INK), { layer: 1, noShadow: true })); }
+
+/* ---------------- offering spot and the Annakut ---------------- */
+const ANNA = new V2(0, -19.6);
+const anna = { g: new THREE.Group(), foods: [], items: [], diyas: [] };
+anna.g.position.set(ANNA.x, 0, ANNA.y); world.add(anna.g);
+{ const leaf = mk(latheG([[0, 0], [1, 0], [1.03, .06], [0, .08]], 20), LEAF); leaf.scale.set(1.9, 1, 1.3); anna.g.add(leaf);
+  const lay = [[9, 1.05, 0], [7, .72, 1], [5, .42, 2], [1, 0, 3]];
+  anna.foods.push(ball(anna.g, new V3(0, .36, 0), .3, FOOD[0]));
+  let k = 1; for (const [cnt, rr, lv] of lay) for (let i = 0; i < cnt; i++){ const a = i/cnt*TAU + lv*.5;
+    anna.foods.push(ball(anna.g, new V3(rr*Math.cos(a)*1.25, .36 + lv*.36, rr*Math.sin(a)*.9), .3, FOOD[(k++*3)%FOOD.length])); }
+  for (const f of anna.foods) f.visible = false;
+  for (let i = 0; i < 7; i++){ const a = PI*.08 + i/6*PI*.84, d = diya(world, ANNA.x + 2.6*Math.cos(a), 0, ANNA.y + 1.9*Math.sin(a)); d.visible = false; anna.diyas.push(d); }
+  castShadow(anna.g); }
+
+/* ---------------- offerings to gather ---------------- */
+function stool(x, z){ const g = new THREE.Group(); g.position.set(x, 0, z); g.add(at(mk(new THREE.BoxGeometry(.6, .4, .6), BARK), 0, .2, 0)); world.add(g); return g; }
+function butterPot(parent, y = .4){ const g = new THREE.Group(); pot(g, 0, 0, 0, .8); ball(g, new V3(0, .42, 0), .16, WHITE); g.position.y = y; parent.add(g); return g; }
+function laddoos(parent, y = .4){ const g = new THREE.Group(); g.add(mk(latheG([[0, 0], [.18, 0], [.3, .16], [.26, .17], [0, .03]], 12), BARK));
+  for (const [x, yy, z] of [[0, .2, 0], [.13, .17, .05], [-.12, .17, .06], [.02, .17, -.13], [0, .3, .02]]) ball(g, new V3(x, yy, z), .085, GOLD); g.position.y = y; parent.add(g); return g; }
+function garland(parent, y = .42){ const g = new THREE.Group(); for (let i = 0; i < 14; i++){ const a = i/14*TAU; ball(g, new V3(.24*Math.cos(a), .04, .24*Math.sin(a)), .07, i%2 ? MUSTARD : TOMATO); } g.position.y = y; parent.add(g); return g; }
+const OFFERS = [
+  { key: 'butter', name: 'the pot of butter', who: 'yashoda', at: [-6.4, 16.2], make: butterPot, line: 'Take my freshest butter for the hill. Only for the hill, Kanha!' },
+  { key: 'laddoo', name: 'the basket of laddoos', who: 'lalita', at: [-11.5, -5.8], make: laddoos, line: 'I rolled these all morning. Govardhan should have the sweetest ones.' },
+  { key: 'garland', name: 'the marigold garland', who: 'subala', at: [10.6, -11.2], make: garland, line: 'I strung these for the cows. Now the hill can wear them too!' },
+];
+for (const o of OFFERS){ o.g = stool(o.at[0], o.at[1]); o.item = o.make(o.g); castShadow(o.g); o.taken = false; }
+const placed = new THREE.Group(); anna.g.add(placed); placed.visible = false;
+butterPot(placed, .06).position.set(-.85, .06, .35); laddoos(placed, .06).position.set(.85, .06, .3); garland(placed, .1).position.set(0, .1, .5);
+
+/* ---------------- clouds, lightning, rainbow, rain, ripples, particles ---------------- */
+const cloudMat = toon(pal('#ffffff', '#fffffe', '#fffffd'), 0); // own material, palette blended clear -> storm
+const CLOUDS = [];
+seedV = 77;
+for (let i = 0; i < 13; i++){ const g = new THREE.Group(), a = i/13*TAU + rnd()*.4, r = 14 + rnd()*36;
+  g.userData.base = new V3(r*Math.cos(a), 0, -12 + r*Math.sin(a)); const n = 4 + Math.floor(rnd()*3);
+  for (let k = 0; k < n; k++){ const m = new THREE.Mesh(sphG(14, 10), cloudMat); m.onBeforeRender = onBR; m.userData.noShadow = true;
+    const s = 2.4 + rnd()*2.4; m.scale.set(s, s*.8, s); m.position.set((k - n/2)*2.8 + rnd(), rnd()*1.6, (rnd() - .5)*3); g.add(m); }
+  sameId(g); world.add(g); CLOUDS.push(g); }
+const bolt = new THREE.Group(); world.add(bolt); bolt.visible = false;
+const boltRods = Array.from({ length: 7 }, () => rod(bolt, new V3(), new V3(0, 1, 0), .22, flatP('#fff3c2'), { emis: 1, noShadow: true }));
+sameId(bolt);
+function strike(){ const a = rnd()*TAU, r = 30 + rnd()*25, c = new V3(player.pos.x + r*Math.cos(a), 0, player.pos.y + r*Math.sin(a));
+  let p = new V3(c.x, 30, c.z); boltRods.forEach((m, i) => { const q = new V3(c.x + (rnd() - .5)*5, 30 - (i + 1)*30/7, c.z + (rnd() - .5)*5); setRod(m, p, q); p = q; });
+  bolt.visible = true; G.boltT = .14; G.flash = 1; sfx.thunder(); }
+const rainbow = new THREE.Group(); rainbow.position.set(0, -6, -140); world.add(rainbow);
+const rbMat = []; ['#e8584a', '#f39a3d', '#f6d04d', '#7cc36a', '#5a8fd6', '#8a6cc8'].forEach((c, i) => {
+  const m = new THREE.ShaderMaterial({ uniforms: { uC: { value: hv(c) }, uA: { value: 0 }, uP: { value: hv(PAPER) } }, transparent: true, depthWrite: false,
+    vertexShader: `void main(){ gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
+    fragmentShader: `uniform vec3 uC; uniform vec3 uP; uniform float uA; void main(){ gl_FragColor = vec4(uC, uA); }` });
+  rbMat.push(m); const t = new THREE.Mesh(new THREE.TorusGeometry(92 - i*2.6, 1.3, 4, 80, PI), m); t.layers.set(1); rainbow.add(t); });
+rainbow.visible = false;
+// rain: thin 3D strokes that stop at the hill, so nobody under it gets wet
+const RAIN_N = 2600, rainU = { uTime: { value: 0 }, uAmt: { value: 0 }, uCam: { value: new V3() }, uWind: { value: new V2() },
+  uHill: { value: new THREE.Vector4(0, 0, 0, 0) }, uHR: { value: new V2(HR[0], HR[1]) }, uHH: { value: HH }, uCol: { value: hv('#4f6fb3') } };
+{ const base = new THREE.CylinderGeometry(.016, .016, .65, 3, 1, true), ig = new THREE.InstancedBufferGeometry();
+  ig.index = base.index; ig.setAttribute('position', base.getAttribute('position'));
+  const sd = new Float32Array(RAIN_N*3); for (let i = 0; i < sd.length; i++) sd[i] = Math.random(); ig.setAttribute('aSeed', new THREE.InstancedBufferAttribute(sd, 3)); ig.instanceCount = RAIN_N;
+  const m = new THREE.Mesh(ig, new THREE.ShaderMaterial({ uniforms: rainU,
+    vertexShader: `attribute vec3 aSeed; uniform float uTime; uniform float uAmt; uniform vec3 uCam; uniform vec2 uWind; uniform vec4 uHill; uniform vec2 uHR; uniform float uHH;
+void main(){ float R = 26.; vec2 c = uCam.xz; vec2 p = c + (fract(aSeed.xy - c/(2.*R)) - .5)*2.*R; float H = 22.;
+  float y = uCam.y - 3. + H - mod(uTime*15. + aSeed.z*97.13, H); float hide = step(uAmt, fract(aSeed.z*7.31));
+  vec2 dd = (p - uHill.xy)/(uHR*uHill.w); float rho = length(dd); float top = uHill.z + uHH*pow(max(1. - rho*rho, 0.), .8);
+  if (rho < 1. && y < top + .3) hide = 1.;
+  vec3 pos = position; pos.xz += uWind*pos.y*1.4; vec3 w = vec3(p.x, y, p.y) + pos; if (hide > .5) w = vec3(0., -900., 0.);
+  gl_Position = projectionMatrix*viewMatrix*vec4(w, 1.); }`,
+    fragmentShader: `uniform vec3 uCol; void main(){ gl_FragColor = vec4(uCol, 1.); }` }));
+  m.frustumCulled = false; m.layers.set(1); world.add(m); }
+// flute ripples: ink rings that spread over the ground from you
+const ripples = Array.from({ length: 7 }, () => { const m = new THREE.Mesh(new THREE.TorusGeometry(1, .045, 4, 72).rotateX(PI/2),
+  new THREE.ShaderMaterial({ uniforms: { uA: { value: 0 }, uC: { value: hv(INK) } }, transparent: true, depthWrite: false,
+    vertexShader: `void main(){ gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
+    fragmentShader: `uniform vec3 uC; uniform float uA; void main(){ gl_FragColor = vec4(uC, uA); }` }));
+  m.layers.set(1); m.visible = false; m.userData.t = 99; world.add(m); return m; });
+// small falling stones and dust, inked like everything else
+const parts = Array.from({ length: 46 }, (_, i) => { const m = ball(world, new V3(), 1, i%2 ? ROCK : EARTH, { flat: 1, w: 6, h: 4, noShadow: true }); m.visible = false; m.userData.v = new V3(); m.userData.life = 0; return m; });
+function emit(p, v, s = .2, life = 1.5){ const m = parts.find(q => !q.visible); if (!m) return; m.visible = true; m.position.copy(p); m.userData.v.copy(v); m.userData.life = life; m.scale.setScalar(s); }
+
+/* ---------------- Krishna's own hands and flute (first person) ---------------- */
+const vm = new THREE.Group(); scene.add(vm);
+const H = {};
+{ const id = () => PID++;
+  for (const s of ['L', 'R']){ H['arm' + s] = rod(vm, new V3(), new V3(0, 1, 0), .027, KBLUE, { r1: .023, noShadow: true, s: 9 });
+    H['hand' + s] = mk(ellG(.042, .037, .058), KBLUE, { flat: 0, noShadow: true }); vm.add(H['hand' + s]);
+    H['bang' + s] = mk(new THREE.TorusGeometry(.034, .01, 6, 16).rotateX(PI/2), GOLD, { flat: 0, noShadow: true }); vm.add(H['bang' + s]);
+    H['thumb' + s] = rod(vm, new V3(), new V3(0, 1, 0), .016, KBLUE, { r1: .013, noShadow: true });
+    H['fing' + s] = [0, 1, 2].map(() => rod(vm, new V3(), new V3(0, 1, 0), .0135, KBLUE, { r1: .012, noShadow: true })); }
+  H.pinky = rod(vm, new V3(), new V3(0, 1, 0), .014, KBLUE, { r1: .012, noShadow: true }); H.pinkyTip = ball(vm, new V3(), .014, KBLUE, { noShadow: true });
+  H.flute = rod(vm, new V3(), new V3(0, 1, 0), .017, BAMBOO, { noShadow: true, s: 9 });
+  H.holes = Array.from({ length: 4 }, () => ball(vm, new V3(), .0075, flatP(INK), { noShadow: true }));
+  H.tassel = rod(vm, new V3(), new V3(0, 1, 0), .004, flatP(INK), { noShadow: true }); H.bead = ball(vm, new V3(), .016, TOMATO, { noShadow: true });
+  H.feather = new THREE.Group(); }
+// poses in Krishna's body frame (x right, y up, -z ahead), interpolated
+const POSE = {
+  rest:  { sL: [-.26, -.62, -.12], hL: [-.27, -.35, -.47], sR: [.28, -.62, -.12], hR: [.22, -.33, -.48], fa: [.13, -.38, -.43], fb: [.37, -.15, -.68] },
+  flute: { sL: [-.22, -.5, -.12], hL: [-.05, -.17, -.36], sR: [.3, -.5, -.16], hR: [.17, -.21, -.42], fa: [-.16, -.12, -.3], fb: [.42, -.25, -.48] },
+  lift:  { sL: [-.26, -.3, -.12], hL: [-.13, .4, -.24], sR: [.28, -.62, -.12], hR: [.22, -.33, -.48], fa: [.13, -.38, -.43], fb: [.37, -.15, -.68] },
+  liftFlute: { sL: [-.26, -.3, -.12], hL: [-.13, .4, -.24], sR: [.3, -.56, -.2], hR: [.15, -.24, -.46], fa: [-.02, -.17, -.36], fb: [.44, -.33, -.6] },
+};
+const vmP = JSON.parse(JSON.stringify(POSE.rest));
+const A3 = a => new V3(a[0], a[1], a[2]);
+function poseHands(dt, target){ const T = POSE[target], k = 1 - Math.exp(-dt*7);
+  for (const key in vmP) for (let i = 0; i < 3; i++) vmP[key][i] = lerp(vmP[key][i], T[key][i], k);
+  const lifting = target.startsWith('lift') ? clamp(1 - Math.abs(vmP.hL[1] - .4)/.6) : 0;
+  for (const s of ['L', 'R']){ const sh = A3(vmP['s' + s]), hd = A3(vmP['h' + s]), dir = hd.clone().sub(sh).normalize();
+    const wrist = hd.clone().addScaledVector(dir, -.06); setRod(H['arm' + s], sh, wrist);
+    H['hand' + s].position.copy(hd); H['hand' + s].quaternion.setFromUnitVectors(new V3(0, 0, -1), dir);
+    H['bang' + s].position.copy(hd).addScaledVector(dir, -.085); H['bang' + s].quaternion.setFromUnitVectors(UP, dir);
+    const th = hd.clone().add(new V3(s === 'L' ? .04 : -.04, .03, 0)); setRod(H['thumb' + s], hd, th.addScaledVector(dir, .03));
+    const side = new V3().crossVectors(dir, UP).normalize(), curl = new V3().crossVectors(side, dir).normalize().multiplyScalar(-1);
+    H['fing' + s].forEach((m, i) => { const b0 = hd.clone().addScaledVector(dir, .04).addScaledVector(side, (i - 1)*.021); setRod(m, b0, b0.clone().addScaledVector(dir, .022).addScaledVector(curl, .03)); }); }
+  const tipBase = A3(vmP.hL).add(new V3(0, .05, 0)), tip = tipBase.clone().add(new V3(-.005, .12*lifting + .02, -.01));
+  setRod(H.pinky, tipBase, tip); H.pinkyTip.position.copy(tip); H.pinky.visible = H.pinkyTip.visible = lifting > .2;
+  const fa = A3(vmP.fa), fb = A3(vmP.fb); setRod(H.flute, fa, fb);
+  H.holes.forEach((m, i) => m.position.copy(fa).lerp(fb, .45 + i*.1).add(new V3(0, .016, 0)));
+  const tb = fa.clone().lerp(fb, .92); setRod(H.tassel, tb, tb.clone().add(new V3(0, -.07, 0))); H.bead.position.copy(tb).add(new V3(0, -.08, 0));
+  return { tip: tip.clone() };
+}
+
+/* ---------------- the people of Vraj ---------------- */
+const DEFS = [
+  { id: 'nanda', name: 'Nanda Baba', kind: 'elder', at: [1.6, 6.2], skin: SK1, low: WHITE, top: WHITE, hat: WHITE, staff: true, beard: true, storm: [7, -6] },
+  { id: 'yashoda', name: 'Yashoda Maiya', kind: 'gopi', at: [-5.2, 14.6], skin: SK2, low: BLUSH, top: TEAL, storm: [-9, 9] },
+  { id: 'subala', name: 'Subala', kind: 'gopa', at: [8.6, -9.6], skin: SK2, low: WHITE, top: TOMATO, hat: MUSTARD, scale: .84, storm: [23, -17] },
+  { id: 'shridama', name: 'Shridama', kind: 'gopa', at: [16.5, 6.5], skin: SK1, low: WHITE, top: TEAL, hat: TOMATO, scale: .86, storm: [-25, -19] },
+  { id: 'lalita', name: 'Lalita', kind: 'gopi', at: [-10.6, -4.2], skin: SK1, low: INDIGO, top: MUSTARD, storm: [-19, -4] },
+  { id: 'dadi', name: 'Dadi', kind: 'gopi', at: [-15.5, 8.5], skin: SK1, low: WHITE, top: WHITE, veil: true, staff: true, storm: [-3, 13] },
+  { id: 'kapila', name: 'Kapila the cow', kind: 'cow', m: COW, at: [5, -14.5], storm: [24, -29] },
+  { id: 'gauri', name: 'Gauri the cow', kind: 'cow', m: COWB, at: [12, -15.5], storm: [25, -9] },
+  { id: 'shyama', name: 'Shyama the cow', kind: 'cow', m: COW, at: [15.5, -9], storm: [-24, -31] },
+  { id: 'dhavali', name: 'Dhavali the cow', kind: 'cow', m: COWB, at: [3, -9.5], storm: [5, 3] },
+  { id: 'calf', name: 'the little calf', kind: 'cow', calf: true, m: COW, at: [8.5, -12.5], storm: [-26, -13] },
+];
+const NPC = {}, NPCS = DEFS.map((d, i) => { const b = d.kind === 'cow' ? cowMesh(d) : person(d);
+  const n = { d, ...b, pos: new V2(d.at[0], d.at[1]), h: Math.atan2(-d.at[0], 4 - d.at[1]), home: new V2(d.at[0], d.at[1]), target: null, speed: 1.6,
+    mode: 'idle', heard: false, safe: false, slot: null, pose: 'down', pointAt: null, walkT: rnd()*9, idx: i, cow: d.kind === 'cow', wanderT: 0 };
+  NPC[d.id] = n; return n; });
+const PEOPLE = NPCS.filter(n => !n.cow);
+NPCS.forEach((n, i) => { const k = n.cow ? NPCS.filter(m => m.cow).indexOf(n) : PEOPLE.indexOf(n), c = n.cow ? 5 : 6;
+  const a = (k + .5)/c*TAU + (n.cow ? .3 : 0), r = n.cow ? 7.4 + (k%2)*1.1 : 4.2 + (k%2)*.7; n.slot = new V2(Math.cos(a)*r, Math.sin(a)*r); });
+
+/* ---------------- state ---------------- */
+const player = { pos: new V2(2.5, 25), yaw: 0, pitch: .04, bob: 0, eye: 1.15, pose: 'rest', vel: 0 };
+const G = { beat: 'talk', step: 0, t: 0, storm: 0, stormT: 0, night: 0, rainbow: 0, lift: 0, lower: 0, day: 0, dayT: 0, stuck: 0, talked: {}, carried: 0,
+  thanked: 0, flash: 0, boltT: 0, nextBolt: 4, shake: 0, wind: new V2(), bal: new V2(), gust: null, nextGust: 2, gusts: 0, balT: 0, safeN: 0, callT: 3,
+  fluteT: 0, noteI: 0, rippleT: 0, relentT: 0, celebrateT: 0, ended: false, paused: false, started: false, hillHome: true, holdingHill: false,
+  hillFrom: new V3(), dayLine: 0, beatT: 0, glowing: [], hintShown: 0, objTarget: null, lastObj: '' };
+const inp = { f: 0, b: 0, l: 0, r: 0, hold: false, flute: false, mdx: 0, mdy: 0, e: false };
+const SET = { wob: 2.4, grain: .8, sens: 1, vol: .7 };
+
+/* ---------------- sound: synthesised flute, rain, wind, thunder, bells ---------------- */
+const sfx = (() => {
+  let ctx = null, master, rainG, rainLP, windG, windBP, rumbleG, noiseBuf;
+  const SCALE = [293.66, 329.63, 369.99, 440, 493.88, 587.33, 659.25];
+  const TUNE = [2, 3, 4, 5, 4, 3, 2, 1, 0, 1, 2, 3, 3, 4, 5, 6, 5, 4, 3, 2];
+  function init(){ if (ctx) return; try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
+    master = ctx.createGain(); master.gain.value = SET.vol; master.connect(ctx.destination);
+    noiseBuf = ctx.createBuffer(1, ctx.sampleRate*2, ctx.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random()*2 - 1;
+    const loop = () => { const s = ctx.createBufferSource(); s.buffer = noiseBuf; s.loop = true; s.start(); return s; };
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 700; rainLP = ctx.createBiquadFilter(); rainLP.type = 'lowpass'; rainLP.frequency.value = 6000;
+    rainG = ctx.createGain(); rainG.gain.value = 0; loop().connect(hp); hp.connect(rainLP); rainLP.connect(rainG); rainG.connect(master);
+    windBP = ctx.createBiquadFilter(); windBP.type = 'bandpass'; windBP.frequency.value = 380; windBP.Q.value = .8; windG = ctx.createGain(); windG.gain.value = 0;
+    loop().connect(windBP); windBP.connect(windG); windG.connect(master);
+    const ro = ctx.createOscillator(); ro.frequency.value = 44; rumbleG = ctx.createGain(); rumbleG.gain.value = 0; ro.connect(rumbleG); rumbleG.connect(master); ro.start(); }
+  function env(g, t, a, peak, rel){ g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + rel); }
+  return {
+    init, get on(){ return !!ctx; },
+    vol(v){ if (master) master.gain.value = v; },
+    note(){ if (!ctx) return; const f = SCALE[TUNE[G.noteI++%TUNE.length]], t = ctx.currentTime;
+      const o = ctx.createOscillator(), o2 = ctx.createOscillator(), g = ctx.createGain(), g2 = ctx.createGain(), lfo = ctx.createOscillator(), lg = ctx.createGain();
+      o.type = 'sine'; o.frequency.value = f; o2.type = 'triangle'; o2.frequency.value = f*2; g2.gain.value = .12;
+      lfo.frequency.value = 5.3; lg.gain.value = f*.006; lfo.connect(lg); lg.connect(o.frequency); lg.connect(o2.frequency);
+      o.connect(g); o2.connect(g2); g2.connect(g); g.connect(master); env(g, t, .07, .2, .55);
+      const n = ctx.createBufferSource(); n.buffer = noiseBuf; const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f*2; bp.Q.value = 2.5;
+      const ng = ctx.createGain(); n.connect(bp); bp.connect(ng); ng.connect(master); env(ng, t, .03, .05, .25);
+      for (const s of [o, o2, lfo, n]){ s.start(t); s.stop(t + .9); } },
+    thunder(){ if (!ctx) return; const t = ctx.currentTime, n = ctx.createBufferSource(); n.buffer = noiseBuf; const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 170;
+      const g = ctx.createGain(); n.connect(lp); lp.connect(g); g.connect(master); env(g, t + .25, .08, .9, 2.4); n.start(t); n.stop(t + 3.2); },
+    bell(){ if (!ctx) return; const t = ctx.currentTime; for (const [f, v] of [[880, .12], [1326, .06], [2210, .03]]){ const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = f; o.connect(g); g.connect(master); env(g, t, .005, v, 1.8); o.start(t); o.stop(t + 2); } },
+    gust(){ if (!ctx) return; const t = ctx.currentTime; windG.gain.cancelScheduledValues(t); windG.gain.setValueAtTime(windG.gain.value, t); windG.gain.linearRampToValueAtTime(.32, t + .4); windG.gain.linearRampToValueAtTime(.06*G.storm, t + 1.8);
+      windBP.frequency.setValueAtTime(300, t); windBP.frequency.linearRampToValueAtTime(700, t + .6); windBP.frequency.linearRampToValueAtTime(320, t + 1.8); },
+    tick(){ if (!ctx) return; const under = G.holdingHill ? 1 : 0; rainG.gain.value = .16*G.storm*(G.beat === 'end' ? 0 : 1); rainLP.frequency.value = under ? 900 : 6000;
+      rumbleG.gain.value = G.beat === 'lift' && inp.hold ? .18 : (G.beat === 'lower' && inp.hold ? .12 : 0); },
+  };
+})();
+
+/* ---------------- HUD ---------------- */
+const objEl = $('obj'), hintEl = $('hint'), promptEl = $('prompt'), cueEl = $('cue'), statsEl = $('stats'), crossEl = $('cross');
+function objective(text, target, hints = []){ G.objText = text; G.objTarget = target; G.hints = hints; G.stuck = 0; G.hintShown = 0; hintEl.classList.remove('show');
+  objEl.innerHTML = `<span class="k">Now</span>${text}`; objEl.classList.add('new'); setTimeout(() => objEl.classList.remove('new'), 900); }
+function progress(){ G.stuck = 0; if (G.hintShown){ G.hintShown = 0; hintEl.classList.remove('show'); } }
+let promptHTML = '';
+function prompt(html){ if (html === promptHTML) return; promptHTML = html; promptEl.innerHTML = html; promptEl.classList.toggle('show', !!html); crossEl.classList.toggle('on', !!html); }
+const KEY = k => `<span class="key">${k}</span>`;
+let statsHTML = '';
+function drawStats(){ const L = [];
+  if (G.day > 0 && ['days', 'relent'].includes(G.beat)) L.push(['Days of rain', `${Math.min(7, G.day)} of 7`]);
+  if (['balance', 'shelter', 'days'].includes(G.beat)) L.push(['Dry and safe', `${G.safeN} of ${NPCS.length}`]);
+  if (G.beat === 'offer' && G.carried < 3) L.push(['Offerings', `${G.carried} of 3`]);
+  const h = L.map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+  if (h !== statsHTML){ statsHTML = h; statsEl.innerHTML = h; } }
+// speech bubbles: villagers call out; off-screen voices cling to the screen edge on their side
+const bubbles = [];
+function say(n, text, dur = 3.4){ let b = bubbles.find(x => x.n === n);
+  if (!b){ const el = document.createElement('div'); el.className = 'bub'; $('hud').appendChild(el); b = { el, n }; bubbles.push(b); }
+  b.el.innerHTML = `<b>${n.d.name}</b>${text}`; b.until = G.t + dur; }
+function drawBubbles(){ const W = innerWidth, Hh = innerHeight, edgeY = { '-1': [], '1': [] };
+  for (const b of bubbles){ if (G.t > b.until || G.dlg){ b.el.style.opacity = 0; continue; }
+    const p = new V3(b.n.pos.x, b.n.top + .3 + (b.n.g.position.y || 0), b.n.pos.y).project(camera); let x = (p.x*.5 + .5)*W, y = (-p.y*.5 + .5)*Hh, edge = 0;
+    if (p.z > 1){ x = W - x; y = Hh*.62; edge = x < W/2 ? -1 : 1; }
+    if (x < 130){ x = 130; edge = -1; } if (x > W - 130){ x = W - 130; edge = 1; } if (y < 110) y = 110; if (y > Hh - 40) y = Hh - 40;
+    if (edge){ x = edge < 0 ? 14 : W - 14; const used = edgeY[edge]; for (let k = 0; k < 6 && used.some(u => Math.abs(u - y) < 56); k++) y += 58; used.push(y); }
+    b.el.className = 'bub' + (edge < 0 ? ' el' : edge > 0 ? ' er' : '');
+    b.el.style.transform = edge < 0 ? 'translate(0,-50%)' : edge > 0 ? 'translate(-100%,-50%)' : 'translate(-50%,-100%)';
+    b.el.style.left = x + 'px'; b.el.style.top = (edge ? y - 20 : y - 8) + 'px'; b.el.style.opacity = 1; } }
+// dialogue
+const dlgEl = $('dlg');
+function dialog(n, lines, done){ G.dlg = { n, lines, i: 0, done }; dlgEl.style.display = 'block'; showLine(); progress(); }
+function showLine(){ const [who, text] = G.dlg.lines[G.dlg.i], you = who === 'you';
+  $('dlgWho').textContent = you ? 'Kanha (you)' : who; $('dlgWho').className = 'who' + (you ? ' you' : ''); $('dlgLine').textContent = text; }
+function advance(){ if (!G.dlg) return; G.dlg.i++; if (G.dlg.i >= G.dlg.lines.length){ const f = G.dlg.done; G.dlg = null; dlgEl.style.display = 'none'; if (f) f(); } else showLine(); }
+
+/* ---------------- the story, beat by beat ---------------- */
+const Y = 'you';
+const LATER = []; const later = (f, ms) => LATER.push(setTimeout(f, ms)); const clearLater = () => { LATER.forEach(clearTimeout); LATER.length = 0; bubbles.forEach(b => b.until = 0); };
+function setGlow(list){ for (const g of G.glowing) setHL(g, false); G.glowing = list; for (const g of list) setHL(g, true); }
+function startTalk(){ G.beat = 'talk'; G.step = 0;
+  objective('Find Nanda Baba at the yajna altar and talk to him', () => npcAt(NPC.nanda),
+    ['Nanda Baba is the elder in white with the staff, beside the altar of clay pots.', 'Walk up to the glowing elder with WASD and press E.']);
+  setGlow([NPC.nanda.g]); }
+const npcAt = n => new V3(n.pos.x, 1.2*n.s, n.pos.y);
+function talkNanda1(){ dialog(NPC.nanda, [
+  ['Nanda Baba', 'Kanha! Help me set out these pots. Tomorrow all of Vraj holds the great yajna for Indra, king of the sky.'],
+  [Y, 'Baba, why do we worship Indra?'],
+  ['Nanda Baba', 'Indra sends the rain. Rain grows the grass, and grass feeds our cows. It has always been so.'],
+  [Y, 'But Baba, it is Govardhan hill whose grass feeds our cows, and whose streams water our fields. We are cowherds. Our hill and our cows are our wealth.'],
+  ['Nanda Baba', 'You speak like an elder, little one. Go and ask the others. If Vraj agrees, so will I.'],
+], () => { G.step = 1; objective('Ask Vraj what they think: Subala and Yashoda Maiya (0 of 2)', () => nearestUntalked(),
+  ['Subala is with the cows by the stream. Yashoda Maiya is outside your home, by the hut near where you started.', 'Look for the glowing outlines, walk up and press E.']);
+  setGlow([NPC.subala.g, NPC.yashoda.g]); say(NPC.subala, 'Kanha! Come and see the cows!', 4); }); }
+const nearestUntalked = () => { const c = ['subala', 'yashoda'].filter(k => !G.talked[k]).map(k => NPC[k]); c.sort((a, b) => a.pos.distanceTo(player.pos) - b.pos.distanceTo(player.pos)); return c[0] ? npcAt(c[0]) : null; };
+function afterAsk(k){ G.talked[k] = true; const n = ['subala', 'yashoda'].filter(x => G.talked[x]).length; setGlow(['subala', 'yashoda'].filter(x => !G.talked[x]).map(x => NPC[x].g));
+  if (n < 2){ objective(`Ask Vraj what they think: Subala and Yashoda Maiya (${n} of 2)`, () => nearestUntalked(), G.hints); return; }
+  G.step = 2; objective('Go back and tell Nanda Baba what Vraj thinks', () => npcAt(NPC.nanda), ['Nanda Baba is at the altar in the middle of the village.']); setGlow([NPC.nanda.g]); }
+function talkSubala(){ dialog(NPC.subala, [
+  ['Subala', 'Kanha! Look how the cows pull towards the hill. They know where the sweet grass grows.'],
+  [Y, 'Govardhan feeds them every day, Subala. Shall we thank the hill this year, instead of Indra?'],
+  ['Subala', 'A festival for our hill and our cows? Yes! I will tell all the gopas!'],
+], () => afterAsk('subala')); }
+function talkYashoda(){ dialog(NPC.yashoda, [
+  ['Yashoda Maiya', 'There you are, my Kanha! Have you been near the butter pots again?'],
+  [Y, 'Maiya, what if we cook for Govardhan this year? A whole mountain of food, for the hill that feeds us.'],
+  ['Yashoda Maiya', 'A mountain of food for a mountain. You and your ideas! I will start cooking.'],
+], () => afterAsk('yashoda')); }
+function talkNanda2(){ dialog(NPC.nanda, [
+  ['Nanda Baba', 'All of Vraj speaks of Govardhan. So be it. This year we honour the hill, the cows, and each other.'],
+  ['Nanda Baba', 'Bring offerings from the village to the foot of the hill, Kanha. We will follow.'],
+], startOffer); }
+function startOffer(){ G.beat = 'offer'; G.step = 0; objective('Gather offerings for Govardhan from the villagers', () => nearestOffer(),
+  ['Yashoda Maiya has butter, Lalita has laddoos, Subala has a garland. They sit on little stools beside them.', 'Walk to a glowing stool and press E to take the offering.']);
+  setGlow(OFFERS.map(o => o.g)); say(NPC.yashoda, 'Kanha! Your butter is ready!', 4); }
+const nearestOffer = () => { const c = OFFERS.filter(o => !o.taken); c.sort((a, b) => a.g.position.distanceTo(pv3()) - b.g.position.distanceTo(pv3())); return c[0] ? c[0].g.position.clone().setY(.6) : null; };
+const pv3 = () => new V3(player.pos.x, 0, player.pos.y);
+function takeOffer(o){ o.taken = true; o.item.visible = false; G.carried++; sfx.bell(); progress(); say(NPC[o.who], o.line, 4.5); setGlow(OFFERS.filter(q => !q.taken).map(q => q.g));
+  if (G.carried < 3){ objective(`Gather offerings for Govardhan (${G.carried} of 3)`, () => nearestOffer(), G.hints); return; }
+  objective('Carry the offerings to the leaf at the foot of Govardhan', () => new V3(ANNA.x, .4, ANNA.y), ['The big green hill is north of the village. The leaf platter glows at its foot.', 'Walk to the leaf platter and press E.']);
+  setGlow([anna.g]); }
+function placeOffers(){ placed.visible = true; hill.garland.visible = true; sfx.bell(); setTimeout(() => sfx.bell(), 350); setGlow([]); G.beat = 'offered'; G.beatT = 0; progress();
+  objective('Watch over the offering with the people of Vraj', null);
+  PEOPLE.forEach((n, i) => { const a = PI*.15 + i/5*PI*.7; n.target = new V2(ANNA.x + 4.4*Math.cos(a), ANNA.y + 3.6*Math.sin(a)); n.mode = 'walk'; n.speed = 2.4; });
+  later(() => say(NPC.nanda, 'Govardhan, thank you for the grass and the water.', 4), 1600);
+  later(() => say(NPC.dadi, 'Look how the garland suits the hill.', 4), 4200); }
+function startStorm(){ G.beat = 'storm'; G.stormT = 0; G.nextBolt = 2.5; setGlow([hill.g]);
+  objective('Indra\'s storm! Run to Govardhan hill', () => hillNear(),
+    ['Everyone is scattering. Run back to the foot of the big hill, north of the village.', 'Stand at the foot of Govardhan, then hold the left mouse button (or Space).']);
+  NPCS.forEach(n => { n.mode = 'panic'; n.target = new V2(n.d.storm[0], n.d.storm[1]); n.speed = n.cow ? 2.6 : 3.2; n.pose = 'up'; });
+  later(() => say(NPC.subala, 'Kanha! Look at the sky!', 3.5), 600);
+  later(() => say(NPC.nanda, 'Indra is angry that we did not worship him.', 4), 2600);
+  later(() => say(NPC.yashoda, 'The calf! Where is the little calf?', 4), 5200); }
+const hillNear = () => { const d = new V2(player.pos.x - hill.pos.x, player.pos.y - hill.pos.z); const a = Math.atan2(d.y/HR[1], d.x/HR[0]);
+  return new V3(hill.pos.x + HR[0]*1.03*Math.cos(a), 1.5, hill.pos.z + HR[1]*1.03*Math.sin(a)); };
+const hillRho = () => Math.hypot((player.pos.x - hill.pos.x)/HR[0], (player.pos.y - hill.pos.z)/HR[1]);
+function startLift(){ G.beat = 'lift'; G.lift = 0; G.hillFrom.copy(hill.pos); setGlow([]); progress(); G.hillHome = false;
+  objective('Hold to lift Govardhan', null, ['Keep holding the left mouse button (or Space). The hill is heavy only for the world, not for you.']); }
+function startBalance(){ G.beat = 'balance'; G.balT = 0; G.gusts = 0; G.nextGust = 1.4; G.bal.set(0, 0); G.holdingHill = true; progress();
+  objective('Keep Govardhan steady against the wind', null, ['When a gust pushes the gold dot, move the mouse the other way to bring it back inside the ring.', 'Small mouse moves are enough. Keep the dot in the middle of the dashed ring.']);
+  say(NPC.nanda, 'Kanha... you hold the whole hill on one little finger!', 4); }
+function startShelter(){ G.beat = 'shelter'; G.callT = 1.2; progress(); G.gust = null;
+  objective('Play the flute to call everyone under the hill', () => nearestUnsafe(),
+    ['Turn towards a voice calling your name, then hold F (or the right mouse button). Your flute carries furthest in the direction you face.', 'Hold F while you face someone who is still out in the rain.']);
+  setGlow(NPCS.filter(n => !n.safe).map(n => n.g)); }
+const nearestUnsafe = () => { const c = NPCS.filter(n => !n.heard); c.sort((a, b) => a.pos.distanceTo(player.pos) - b.pos.distanceTo(player.pos)); return c[0] ? npcAt(c[0]) : null; };
+const DAYLINES = [['yashoda', 'Rest your arm, my child. No? Then at least eat a little butter.'], ['subala', 'Play us a song, Kanha!'], ['nanda', 'Three days, and not one calf is wet.'],
+  ['lalita', 'We have lamps, and stories, and each other.'], ['shridama', 'The cows are calm. They know your flute.'], ['dadi', 'In all my years I have never felt so safe in a storm.'], ['nanda', 'Listen... the rain is softer.']];
+function startDays(){ G.beat = 'days'; G.day = 1; G.dayT = 0; G.dayLine = 0; G.nextGust = 2; G.bal.set(0, 0); progress(); setGlow([]);
+  objective('Hold Govardhan steady while the storm rages', null, ['Each time the wind pushes the dot, move the mouse against it. The days only pass while the hill is steady.']);
+  shelterDiyas.forEach((d, i) => { const a = (i + .5)/shelterDiyas.length*TAU + .3; d.position.set(hill.pos.x + Math.cos(a)*2.6, 0, hill.pos.z + Math.sin(a)*2.6); d.visible = true; }); }
+function startRelent(){ G.beat = 'relent'; G.relentT = 0; G.gust = null; progress();
+  objective('The rain is stopping', null); say(NPC.nanda, 'The clouds are parting. Indra has seen that no one in Vraj was hurt.', 5);
+  NPCS.forEach((n, i) => { n.mode = 'walk'; n.safe = false; const a = PI*.12 + (i/(NPCS.length - 1))*PI*.76, r = n.cow ? 7.5 : 4.6;
+    n.target = new V2(ANNA.x + r*1.2*Math.cos(a), ANNA.y + 1 + r*Math.sin(a)); n.speed = n.cow ? 1.6 : 2; n.pose = 'down'; }); }
+function startLower(){ G.beat = 'lower'; G.lower = 0; G.hillFrom.copy(hill.pos); progress();
+  objective('Hold to set Govardhan gently back in its place', null, ['Hold the left mouse button (or Space). Everyone is safely out from under it.']); }
+function startCelebrate(){ G.beat = 'celebrate'; G.celebrateT = 0; G.thanked = 0; G.holdingHill = false; progress(); G.hillHome = true;
+  shelterDiyas.forEach(d => d.visible = false);
+  objective('The Annakut: share it with the people of Vraj (0 of 3)', () => nearestUnthanked(), ['Walk up to anyone with a glowing outline and press E.']);
+  PEOPLE.forEach(n => n.pose = 'namaste'); setGlow(PEOPLE.map(n => n.g)); sfx.bell(); }
+const THANKS = { nanda: [['Nanda Baba', 'From this day, every year after Diwali, Vraj will honour Govardhan with a mountain of food.'], [Y, 'And share it with everyone, Baba. Even the cows.']],
+  yashoda: [['Yashoda Maiya', 'My little Kanha held up a mountain for seven days... and still comes home hungry. Eat, my child.']],
+  subala: [['Subala', 'Giridhari! The one who holds the hill! That is your name now.'], [Y, 'Then the hill is my friend too, Subala.']],
+  shridama: [['Shridama', 'I was so scared of the thunder. Then I heard your flute, and my feet knew the way.']],
+  lalita: [['Lalita', 'We cooked everything we had. The hill fed us, so now we feed everyone.']],
+  dadi: [['Dadi', 'Thank the hill, thank the cows, thank the rain. And keep each other safe, children.']] };
+const nearestUnthanked = () => { const c = PEOPLE.filter(n => !G.talked['t_' + n.d.id]); c.sort((a, b) => a.pos.distanceTo(player.pos) - b.pos.distanceTo(player.pos)); return c[0] ? npcAt(c[0]) : null; };
+function thank(n){ dialog(n, THANKS[n.d.id], () => { G.talked['t_' + n.d.id] = true; G.thanked++; setHL(n.g, false); G.glowing = G.glowing.filter(g => g !== n.g);
+  if (G.thanked < 3){ objective(`The Annakut: share it with the people of Vraj (${G.thanked} of 3)`, () => nearestUnthanked(), G.hints); return; }
+  G.beat = 'finale'; G.beatT = 0; setGlow([]); objective('Govardhan Puja', null);
+  PEOPLE.forEach((m, i) => setTimeout(() => say(m, i%2 ? 'Jai Giridhari!' : 'Giridhari!', 3.5), 300 + i*500)); }); }
+const shelterDiyas = Array.from({ length: 4 }, () => { const d = diya(world, 0, 0, 0); d.visible = false; return d; });
+
+/* ---------------- interaction targets ---------------- */
+function targets(){ const T = [], add = (obj, pos, label, use) => T.push({ obj, pos, label, use });
+  const nt = (n, label, use) => add(n.g, npcAt(n), label, use);
+  if (G.beat === 'talk'){ if (G.step === 0 || G.step === 2) nt(NPC.nanda, 'Talk to Nanda Baba', G.step ? talkNanda2 : talkNanda1);
+    if (G.step === 1){ if (!G.talked.subala) nt(NPC.subala, 'Talk to Subala', talkSubala); if (!G.talked.yashoda) nt(NPC.yashoda, 'Talk to Yashoda Maiya', talkYashoda); } }
+  if (G.beat === 'offer'){ if (G.carried < 3){ for (const o of OFFERS) if (!o.taken) add(o.g, o.g.position.clone().setY(.5), 'Take ' + o.name, () => takeOffer(o)); }
+    else add(anna.g, new V3(ANNA.x, .3, ANNA.y), 'Offer them to Govardhan', placeOffers); }
+  if (G.beat === 'celebrate') for (const n of PEOPLE) if (!G.talked['t_' + n.d.id]) nt(n, 'Talk to ' + n.d.name, () => thank(n));
+  return T; }
+function focusTarget(){ let best = null, bs = 1e9; const fw = new V2(-Math.sin(player.yaw), -Math.cos(player.yaw));
+  for (const t of targets()){ const d = new V2(t.pos.x - player.pos.x, t.pos.z - player.pos.y), dist = d.length(); if (dist > 3.6) continue;
+    const dot = dist > .01 ? d.normalize().dot(fw) : 1; if (dist > 1.6 && dot < .72) continue; const s = dist - dot*1.5; if (s < bs){ bs = s; best = t; } }
+  return best; }
+
+/* ---------------- input ---------------- */
+let locked = false, dragging = false, lastX = 0, lastY = 0;
+const canLock = 'pointerLockElement' in document && window.top === window;
+function hasMouseLook(){ return locked || dragging; }
+document.addEventListener('pointerlockchange', () => { locked = document.pointerLockElement === canvas; if (!locked && G.started && !G.ended && !G.selftest && lockWanted) pauseGame(true); });
+let lockWanted = false;
+function grab(){ if (!canLock) return; lockWanted = true; try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (e) {} }
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+canvas.addEventListener('mousedown', e => { sfx.init(); if (!G.started || G.paused) return;
+  if (G.dlg && e.button === 0){ advance(); return; }
+  if (canLock && !locked){ grab(); }
+  if (e.button === 0){ inp.hold = true; if (!locked){ dragging = true; lastX = e.clientX; lastY = e.clientY; } }
+  if (e.button === 2) inp.flute = true; });
+addEventListener('mouseup', e => { if (e.button === 0){ inp.hold = false; dragging = false; } if (e.button === 2) inp.flute = false; });
+addEventListener('mousemove', e => { if (locked){ inp.mdx += e.movementX; inp.mdy += e.movementY; }
+  else if (dragging){ inp.mdx += (e.clientX - lastX)*1.2; inp.mdy += (e.clientY - lastY)*1.2; lastX = e.clientX; lastY = e.clientY; } });
+canvas.addEventListener('touchstart', e => { const t = e.touches[0]; dragging = true; lastX = t.clientX; lastY = t.clientY; }, { passive: true });
+canvas.addEventListener('touchmove', e => { const t = e.touches[0]; inp.mdx += (t.clientX - lastX)*1.4; inp.mdy += (t.clientY - lastY)*1.4; lastX = t.clientX; lastY = t.clientY; }, { passive: true });
+canvas.addEventListener('touchend', () => { dragging = false; });
+const KEYS = { KeyW: 'f', ArrowUp: 'f', KeyS: 'b', ArrowDown: 'b', KeyA: 'l', ArrowLeft: 'l', KeyD: 'r', ArrowRight: 'r' };
+addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; sfx.init();
+  if (e.code === 'Escape' || e.code === 'KeyP'){ if (G.started && !G.ended) pauseGame(!G.paused); return; }
+  if (!G.started || G.paused) return;
+  if (KEYS[e.code]){ inp[KEYS[e.code]] = 1; e.preventDefault(); }
+  if (e.code === 'KeyE' || e.code === 'Enter'){ if (G.dlg) advance(); else { const t = focusTarget(); if (t) t.use(); } }
+  if (e.code === 'Space'){ e.preventDefault(); if (G.dlg) advance(); else inp.hold = true; }
+  if (e.code === 'KeyF'){ inp.flute = true; } });
+addEventListener('keyup', e => { if (KEYS[e.code]) inp[KEYS[e.code]] = 0; if (e.code === 'Space') inp.hold = false; if (e.code === 'KeyF') inp.flute = false; });
+addEventListener('blur', () => { inp.f = inp.b = inp.l = inp.r = 0; inp.hold = inp.flute = false; dragging = false; });
+function pauseGame(on){ G.paused = on; $('pause').hidden = !on; if (on){ inp.hold = inp.flute = false; inp.f = inp.b = inp.l = inp.r = 0; if (locked) document.exitPointerLock(); } else grab(); }
+$('resume').onclick = () => pauseGame(false);
+$('restart').onclick = () => { location.hash = ''; location.reload(); };
+$('again').onclick = () => { location.hash = ''; location.reload(); };
+$('stay').onclick = () => { $('end').hidden = true; G.ended = false; grab(); };
+$('begin').onclick = () => { $('title').hidden = true; G.started = true; sfx.init(); grab(); };
+$('sWob').oninput = e => SET.wob = +e.target.value; $('sGrain').oninput = e => SET.grain = +e.target.value;
+$('sSens').oninput = e => SET.sens = +e.target.value; $('sVol').oninput = e => { SET.vol = +e.target.value; sfx.vol(SET.vol); };
+
+/* ---------------- simulation ---------------- */
+const BALANCE_BEATS = ['balance', 'days'];
+function camAuto(){ return G.dlg || ['lift', 'balance', 'days', 'lower', 'finale'].includes(G.beat); }
+function update(dt){
+  G.t += dt; G.beatT += dt;
+  const md = { x: inp.mdx*SET.sens, y: inp.mdy*SET.sens }; inp.mdx = inp.mdy = 0;
+  if (G.paused || !G.started) return;
+  if (BALANCE_BEATS.includes(G.beat)) { G.bal.x += md.x*.0042; G.bal.y += md.y*.0042; }
+  else if (!camAuto()){ player.yaw -= md.x*.0023; player.pitch = clamp(player.pitch - md.y*.0023, -1.25, 1.3); }
+  // walking: a child's quick steps; with the hill on your finger you can barely shuffle
+  const slow = G.holdingHill ? .22 : 1, canWalk = !G.dlg && !['lift', 'lower', 'days', 'finale', 'balance'].includes(G.beat);
+  const mv = new V2((inp.r - inp.l), (inp.b - inp.f)); let moving = false;
+  if (canWalk && mv.lengthSq() > 0){ mv.normalize().multiplyScalar(4.4*slow*dt); const c = Math.cos(player.yaw), s = Math.sin(player.yaw);
+    player.pos.x += mv.x*c + mv.y*s; player.pos.y += -mv.x*s + mv.y*c; moving = true; progressIfCloser(); }
+  collide(player.pos, .35);
+  player.vel = lerp(player.vel, moving ? 1 : 0, 1 - Math.exp(-dt*10)); player.bob += dt*player.vel*9;
+  beats(dt); npcs(dt); weather(dt); hillStep(dt); particles(dt); hints(dt);
+  // hands
+  player.pose = G.holdingHill || G.beat === 'lift' || G.beat === 'lower' && G.lower < .95 ? (inp.flute ? 'liftFlute' : 'lift') : (inp.flute ? 'flute' : 'rest');
+  if (G.beat === 'lift' && G.lift < .08) player.pose = 'rest';
+  // flute
+  if (inp.flute && !G.dlg){ G.fluteT -= dt; G.rippleT -= dt;
+    if (G.fluteT <= 0){ sfx.note(); G.fluteT = .34; } if (G.rippleT <= 0){ ripple(); G.rippleT = .55; } listen(); }
+  else { G.fluteT = 0; G.rippleT = 0; }
+  sfx.tick();
+}
+let lastDist = 1e9;
+function progressIfCloser(){ if (!G.objTarget) return; const t = G.objTarget(); if (!t) return; const d = Math.hypot(t.x - player.pos.x, t.z - player.pos.y); if (d < lastDist - .6){ lastDist = d; G.stuck = Math.max(0, G.stuck - .5); } }
+function collide(p, r){
+  for (const [x, z] of HUTS){ const dx = p.x - x, dz = p.y - z, d = Math.hypot(dx, dz); if (d < 2.3 + r){ p.x = x + dx/d*(2.3 + r); p.y = z + dz/d*(2.3 + r); } }
+  { const dx = p.x - altar.position.x, dz = p.y - altar.position.z, d = Math.hypot(dx, dz); if (d < 1.7 + r){ p.x = altar.position.x + dx/d*(1.7 + r); p.y = altar.position.z + dz/d*(1.7 + r); } }
+  if (hill.pos.y < .5){ const dx = (p.x - hill.pos.x)/HR[0], dz = (p.y - hill.pos.z)/HR[1], rho = Math.hypot(dx, dz), lim = 1.01 + r/HR[1];
+    if (rho < lim){ p.x = hill.pos.x + dx/rho*lim*HR[0]; p.y = hill.pos.z + dz/rho*lim*HR[1]; } }
+  const d = p.length(); if (d > BOARD - 4) p.multiplyScalar((BOARD - 4)/d);
+}
+function beats(dt){
+  const B = G.beat;
+  if (B === 'offered' && G.beatT > 7.5) startStorm();
+  if (B === 'storm'){ G.stormT += dt;
+    if (G.storm > .6 && hillRho() < 1.3){ prompt(`${KEY('Hold')} lift Govardhan`); if (inp.hold) startLift(); }
+    else prompt(''); }
+  if (B === 'lift'){ if (inp.hold) G.lift = Math.min(1, G.lift + dt/5.2); G.shake = inp.hold && G.lift > .2 && G.lift < .75 ? .035 : G.shake*.9;
+    prompt(G.lift < 1 ? `${KEY('Hold')} ${G.lift < .05 ? 'lift Govardhan' : 'keep holding'}` : '');
+    if (G.lift > .25 && G.lift < .7 && Math.random() < dt*14){ const a = Math.random()*TAU; emit(new V3(hill.pos.x + HR[0]*.95*Math.cos(a), hill.pos.y + .1, hill.pos.z + HR[1]*.95*Math.sin(a)), new V3(Math.cos(a)*.6, .2, Math.sin(a)*.6), .12 + Math.random()*.15, 1.2); }
+    if (G.lift >= 1) startBalance(); }
+  if (B === 'balance'){ G.balT += dt; prompt('');
+    if (G.gusts >= 3 && !G.gust && G.balT > 9 && G.bal.length() < .55) startShelter(); else if (G.balT > 22) startShelter(); }
+  if (B === 'shelter'){ prompt(inp.flute ? '' : `${KEY('F')} play the flute`);
+    G.callT -= dt; if (G.callT <= 0){ G.callT = 3.2; const out = NPCS.filter(n => !n.heard); if (out.length){ const n = out[Math.floor(Math.random()*out.length)];
+      say(n, n.cow ? 'Mooo!' : ['Kanha! Where are you?', 'Kanha, we cannot see!', 'Help us, Kanha!', 'Kanha! Over here!'][Math.floor(Math.random()*4)], 2.8); n.pose = 'wave'; } }
+    if (G.safeN >= NPCS.length) startDays(); }
+  if (B === 'days'){ prompt(''); const steady = G.bal.length() < 1;
+    if (steady) G.dayT += dt/3.1; if (G.dayT >= 1){ G.dayT = 0; G.day++; progress(); }
+    const dl = Math.min(6, G.day - 1); if (dl >= G.dayLine && G.dayT > .25 && G.day <= 7){ const [k, t] = DAYLINES[G.dayLine]; say(NPC[k], t, 3); G.dayLine++; }
+    if (G.day > 7){ G.day = 7; startRelent(); } }
+  if (B === 'relent'){ G.relentT += dt; if (G.relentT > 6 && NPCS.every(n => !n.target)) startLower(); else if (G.relentT > 12) startLower(); }
+  if (B === 'lower'){ if (inp.hold) G.lower = Math.min(1, G.lower + dt/4.6); prompt(G.lower < 1 ? `${KEY('Hold')} set the hill down` : '');
+    if (G.lower >= 1){ prompt(''); for (let i = 0; i < 30; i++){ const a = i/30*TAU; emit(new V3(H0.x + HR[0]*Math.cos(a), .2, H0.y + HR[1]*Math.sin(a)), new V3(Math.cos(a)*2, 1.2, Math.sin(a)*2), .25, 1); }
+      G.shake = .05; startCelebrate(); } }
+  if (B === 'celebrate'){ G.celebrateT += dt; const n = Math.min(anna.foods.length, Math.floor(G.celebrateT*7)); anna.foods.forEach((f, i) => f.visible = i < n);
+    anna.diyas.forEach((d, i) => d.visible = G.celebrateT > 1.5 + i*.25); }
+  if (B === 'finale' && G.beatT > 5 && !G.ended){ G.ended = true; $('end').hidden = false; if (locked) document.exitPointerLock(); }
+  if (['talk', 'offer', 'celebrate'].includes(B)){ const t = G.dlg ? null : focusTarget(); prompt(t ? `${KEY('E')} ${t.label}` : ''); }
+  if (G.dlg || B === 'offered' || B === 'relent' || B === 'finale') prompt('');
+}
+function ripple(){ const m = ripples.find(r => r.userData.t > 1.6) || ripples[0]; m.userData.t = 0; m.visible = true; m.position.set(player.pos.x, .55, player.pos.y); }
+// the flute is heard all round you nearby, and far away in the direction you face
+function listen(){ const fw = new V2(-Math.sin(player.yaw), -Math.cos(player.yaw));
+  for (const n of NPCS){ if (n.heard || !['shelter'].includes(G.beat)) continue; const d = new V2(n.pos.x - player.pos.x, n.pos.y - player.pos.y), dist = d.length();
+    const facing = dist > .1 ? d.normalize().dot(fw) : 1; if (dist < 10 || (dist < 46 && facing > .68)){ n.heard = true; n.mode = 'shelter'; n.speed = n.cow ? 2.2 : 2.6; n.pose = 'down';
+      say(n, n.cow ? 'Mooo...' : ['The flute! It is Kanha!', 'I hear Kanha\'s flute!', 'This way, under the hill!'][n.idx%3], 2.6); progress(); } } }
+function npcs(dt){
+  const hc = new V2(hill.pos.x, hill.pos.z);
+  for (const n of NPCS){
+    if (n.mode === 'panic'){ n.wanderT -= dt; if (!n.target && n.wanderT <= 0){ n.wanderT = 1.5 + Math.random()*2; const b = new V2(n.d.storm[0], n.d.storm[1]); n.target = b.add(new V2((Math.random() - .5)*5, (Math.random() - .5)*5)); n.speed = n.cow ? 1.4 : 2.2; } }
+    if (n.mode === 'shelter' || (n.mode === 'safe')){ n.target = hc.clone().add(n.slot); }
+    if (n.target){ const dx = n.target.x - n.pos.x, dz = n.target.y - n.pos.y, d = Math.hypot(dx, dz);
+      if (d > .12){ const st = Math.min(d, n.speed*dt); n.pos.x += dx/d*st; n.pos.y += dz/d*st; n.h += angDiff(n.h, Math.atan2(dx, dz))*Math.min(1, dt*8); n.walkT += dt*n.speed*3.2; }
+      else { n.target = null; if (n.mode === 'shelter') n.mode = 'safe'; if (n.mode === 'walk') n.mode = 'idle'; } }
+    else if (n.mode === 'idle' || n.mode === 'safe'){ const look = G.beat === 'celebrate' || G.beat === 'finale' ? new V2(ANNA.x, ANNA.y) : player.pos;
+      if (G.dlg && G.dlg.n === n || n.mode === 'safe' || G.beat === 'talk' || G.beat === 'offer') n.h += angDiff(n.h, Math.atan2(look.x - n.pos.x, look.y - n.pos.y))*Math.min(1, dt*3);
+      if (G.beat === 'celebrate' || G.beat === 'finale') n.h += angDiff(n.h, Math.atan2(player.pos.x - n.pos.x, player.pos.y - n.pos.y))*Math.min(1, dt*2); }
+    // keep apart a little, and out of the hill while it sits on the ground
+    for (const m of NPCS){ if (m === n) continue; const dx = n.pos.x - m.pos.x, dz = n.pos.y - m.pos.y, d = Math.hypot(dx, dz), r = (n.cow || m.cow) ? 1.1 : .6;
+      if (d < r && d > 1e-4){ n.pos.x += dx/d*(r - d)*.5; n.pos.y += dz/d*(r - d)*.5; } }
+    { const dx = n.pos.x - player.pos.x, dz = n.pos.y - player.pos.y, d = Math.hypot(dx, dz); if (d < .75 && d > 1e-4){ n.pos.x += dx/d*(.75 - d)*.5; n.pos.y += dz/d*(.75 - d)*.5; } }
+    if (hill.pos.y < .5){ const dx = (n.pos.x - hill.pos.x)/HR[0], dz = (n.pos.y - hill.pos.z)/HR[1], rho = Math.hypot(dx, dz);
+      if (rho < 1.04){ n.pos.x = hill.pos.x + dx/rho*1.04*HR[0]; n.pos.y = hill.pos.z + dz/rho*1.04*HR[1]; } }
+    const rho = Math.hypot((n.pos.x - hill.pos.x)/HR[0], (n.pos.y - hill.pos.z)/HR[1]);
+    n.safe = G.holdingHill && rho < .78;
+    // pose the arms
+    if (n.arms){ const k = Math.min(1, dt*6), wetPanic = G.storm > .4 && !n.safe && (G.beat === 'storm' || G.beat === 'lift' || G.beat === 'balance' || (G.beat === 'shelter' && !n.heard));
+      let pose = n.pose; if (wetPanic && pose !== 'wave' && pose !== 'point') pose = 'up'; if (!wetPanic && pose === 'up') pose = 'down';
+      if (pose === 'wave' && G.t > (n.waveUntil || 0) && n.waveUntil) { n.pose = 'down'; n.waveUntil = 0; } if (pose === 'wave' && !n.waveUntil) n.waveUntil = G.t + 2.5;
+      for (const side of [1, -1]){ let dir;
+        if (pose === 'up') dir = new V3(side*.35, 1, .25 + .1*Math.sin(G.t*9 + side));
+        else if (pose === 'wave') dir = side > 0 ? new V3(.6, 1, .2 + .45*Math.sin(G.t*10)) : new V3(-.18, -1, .05);
+        else if (pose === 'namaste') dir = new V3(-side*.62, -.25, .85);
+        else if (pose === 'point' && n.pointAt && side > 0){ const w = new V3(n.pointAt.x - n.pos.x, .35, n.pointAt.z - n.pos.y).normalize(); const c = Math.cos(-n.h), s = Math.sin(-n.h); dir = new V3(w.x*c + w.z*s, w.y, -w.x*s + w.z*c); }
+        else dir = new V3(side*.16, -1, .05 + (n.target ? .3*Math.sin(n.walkT + (side > 0 ? 0 : PI)) : 0));
+        _q.setFromUnitVectors(DOWN, dir.normalize()); n.arms[side].quaternion.slerp(_q, k); }
+      if (pose === 'point' && G.t > n.pointUntil) n.pose = 'down'; }
+    const bob = n.target ? Math.abs(Math.sin(n.walkT))*.06 : (n.safe || G.storm < .3 ? 0 : Math.abs(Math.sin(G.t*13 + n.idx))*.012);
+    n.g.position.set(n.pos.x, bob, n.pos.y); n.g.rotation.y = n.h;
+  }
+  G.safeN = NPCS.filter(n => n.safe).length;
+}
+function pointAndCall(text){ const t = G.objTarget && G.objTarget(); if (!t) return; let best = null, bd = 1e9;
+  for (const n of PEOPLE){ const d = n.pos.distanceTo(player.pos); if (d < bd && d < 30){ bd = d; best = n; } }
+  if (best){ best.pose = 'point'; best.pointAt = t; best.pointUntil = G.t + 4; say(best, text, 4); } }
+function hints(dt){
+  if (G.dlg || G.paused) return;
+  G.stuck += dt;
+  if (G.hints && G.hints.length){
+    if (G.stuck > 20 && G.hintShown < 1){ G.hintShown = 1; hintEl.textContent = G.hints[0]; hintEl.classList.add('show');
+      const calls = { talk: 'Kanha! Over here!', offer: 'Kanha, the offerings are here!', storm: 'To Govardhan, Kanha! To the hill!', shelter: 'Kanha! Play your flute!', celebrate: 'Come and eat, Kanha!' };
+      if (calls[G.beat] && G.beat !== 'shelter') pointAndCall(calls[G.beat]); }
+    if (G.stuck > 40 && G.hintShown < 2 && G.hints[1]){ G.hintShown = 2; hintEl.textContent = G.hints[1]; if (G.beat !== 'shelter') pointAndCall(G.beat === 'storm' ? 'The hill, Kanha! That way!' : 'This way, Kanha!'); } }
+}
+function weather(dt){
+  const stormy = ['storm', 'lift', 'balance', 'shelter', 'days'].includes(G.beat);
+  G.storm = clamp(G.storm + (stormy ? dt/5 : -dt/4.5));
+  const relent = G.beat === 'relent' || G.beat === 'lower' || G.beat === 'celebrate' || G.beat === 'finale';
+  G.rainbow = clamp(G.rainbow + (relent ? dt/4 : -dt)); rainbow.visible = G.rainbow > .01; rbMat.forEach(m => m.uniforms.uA.value = G.rainbow*.92);
+  G.night = G.beat === 'days' ? Math.pow(Math.sin(G.dayT*PI), 1.5)*.85 : Math.max(0, G.night - dt*.5);
+  document.body.classList.toggle('night', G.night > .5);
+  // lightning and gusts
+  if (G.storm > .6 && ['storm', 'lift', 'balance', 'shelter', 'days'].includes(G.beat)){ G.nextBolt -= dt; if (G.nextBolt <= 0){ strike(); G.nextBolt = (G.beat === 'days' ? 4 : 5) + Math.random()*5; } }
+  if (G.boltT > 0){ G.boltT -= dt; if (G.boltT <= 0) bolt.visible = false; }
+  G.flash = Math.max(0, G.flash - dt*5);
+  if (BALANCE_BEATS.includes(G.beat)){ G.nextGust -= dt;
+    if (!G.gust && G.nextGust <= 0){ const a = Math.random()*TAU; G.gust = { dir: new V2(Math.cos(a), Math.sin(a)), t: 0, dur: 1.15 }; sfx.gust(); G.nextGust = G.beat === 'days' ? 1.3 + Math.random()*1.2 : 2.6; }
+    if (G.gust){ G.gust.t += dt; G.bal.addScaledVector(G.gust.dir, 1.05*dt); if (G.gust.t > G.gust.dur){ G.gust = null; G.gusts++; } }
+    G.bal.multiplyScalar(1 - dt*.25); G.bal.clampLength(0, 1.6); }
+  else G.bal.multiplyScalar(1 - Math.min(1, dt*3));
+  const g = G.gust ? G.gust.dir : new V2(.3, .1); G.wind.lerp(new V2(g.x, g.y).multiplyScalar(G.gust ? .5 : .12), 1 - Math.exp(-dt*3));
+  // the sky: paper by day, grey paper in the storm, deep indigo paper at night
+  const amb = new V3(1, 1, 1).lerp(new V3(.86, .88, .95), G.storm).lerp(new V3(.42, .47, .7), G.night); U.uAmb.value.copy(amb);
+  const cs = clamp(G.storm*1.2); const cl = mixHex('#fbf7ec', CLOUD.l, cs), cm = mixHex('#e3dbca', CLOUD.m, cs), cd = mixHex('#a89d86', CLOUD.d, cs);
+  cloudMat.uniforms.cL.value.copy(cl); cloudMat.uniforms.cM.value.copy(cm); cloudMat.uniforms.cD.value.copy(cd);
+  CLOUDS.forEach((c, i) => { const b = c.userData.base, drift = Math.sin(G.t*.05 + i)*3; c.position.set(b.x + drift + G.t*(G.storm*.4)%1, lerp(36 + (i%3)*4, 19 + (i%3)*2.5, G.storm), b.z);
+    c.visible = i < 6 || G.storm > .05; });
+  rainU.uTime.value = G.t; rainU.uAmt.value = clamp((G.storm - .25)/.75)*(G.beat === 'relent' ? clamp(1 - G.relentT/3) : 1); rainU.uWind.value.copy(G.wind);
+  rainU.uCam.value.set(player.pos.x, player.eye, player.pos.y);
+  rainU.uHill.value.set(hill.pos.x, hill.pos.z, hill.pos.y, G.holdingHill ? 1 - clamp(G.bal.length() - 1)*.25 : 1);
+  ripples.forEach(r => { r.userData.t += dt; const t = r.userData.t; r.visible = t < 1.6; if (r.visible){ r.scale.set(1 + t*14, 1.5, 1 + t*14); r.material.uniforms.uA.value = .8*(1 - t/1.6); } });
+  anna.diyas.concat(shelterDiyas).forEach((d, i) => { if (!d.visible) return; const f = 1 + .14*Math.sin(G.t*11 + i*1.7) + .06*Math.sin(G.t*23 + i); d.userData.flame.forEach(m => m.scale.set(1, f, 1)); });
+}
+function hillStep(dt){
+  const tip = fingerWorld();
+  if (G.beat === 'lift'){ const L = G.lift, rise = ease(clamp((L - .18)/.42)), glide = ease(clamp((L - .58)/.42));
+    const top = tip.y + BULGE; hill.pos.y = rise*top + (rise > 0 && rise < 1 ? Math.sin(G.t*30)*.03 : 0);
+    hill.pos.x = lerp(G.hillFrom.x, tip.x, glide); hill.pos.z = lerp(G.hillFrom.z, tip.z, glide); }
+  else if (G.holdingHill && G.beat !== 'lower'){ const off = balOffsetWorld(); hill.pos.set(tip.x + off.x, tip.y + BULGE, tip.z + off.y); }
+  else if (G.beat === 'lower'){ const L = G.lower, glide = ease(clamp(L/.55)), drop = ease(clamp((L - .5)/.5));
+    if (L < .001) G.hillFrom.copy(hill.pos);
+    hill.pos.x = lerp(G.hillFrom.x, H0.x, glide); hill.pos.z = lerp(G.hillFrom.z, H0.y, glide); hill.pos.y = lerp(G.hillFrom.y, 0, drop); }
+  hill.g.position.copy(hill.pos);
+  // the hill leans the way the wind pushes it
+  const off = G.holdingHill && G.beat !== 'lower' ? balOffsetWorld() : new V2(), wob = G.beat === 'lift' ? Math.sin(G.t*2.3)*.012 : 0;
+  hill.g.rotation.x = lerp(hill.g.rotation.x, off.y*.1 + wob, .2); hill.g.rotation.z = lerp(hill.g.rotation.z, -off.x*.1, .2);
+}
+// the gold dot is in screen space (x right, y down). Looking up at the hill, screen-down is towards your back.
+function balOffsetWorld(){ const c = Math.cos(player.yaw), s = Math.sin(player.yaw), bx = G.bal.x*.7, by = G.bal.y*.7; return new V2(bx*c + by*s, -bx*s + by*c); }
+let fingerLocal = new V3(-.135, .58, -.25);
+function fingerWorld(){ const v = fingerLocal.clone().applyAxisAngle(UP, player.yaw); return new V3(player.pos.x + v.x, player.eye + v.y, player.pos.y + v.z); }
+function particles(dt){ for (const m of parts){ if (!m.visible) continue; const u = m.userData; u.life -= dt; if (u.life <= 0 || m.position.y < -.2){ m.visible = false; continue; }
+  u.v.y -= 9*dt; m.position.addScaledVector(u.v, dt); if (m.position.y < .05 && u.v.y < 0){ m.position.y = .05; u.v.multiplyScalar(.3); } } }
+
+/* ---------------- camera ---------------- */
+function cameraStep(dt){
+  const k = 1 - Math.exp(-dt*3.2);
+  if (G.dlg){ const n = G.dlg.n; player.yaw += angDiff(player.yaw, Math.atan2(-(n.pos.x - player.pos.x), -(n.pos.y - player.pos.y)))*k;
+    player.pitch = lerp(player.pitch, Math.atan2(n.top*.85 - player.eye, Math.max(1, n.pos.distanceTo(player.pos))), k); }
+  if (G.beat === 'lift'){ const L = G.lift; player.pitch = lerp(player.pitch, lerp(.05, .7, ease(clamp(L/.85))), k*1.4);
+    const hc = new V2(G.hillFrom.x, G.hillFrom.z); if (L < .6) player.yaw += angDiff(player.yaw, Math.atan2(-(hc.x - player.pos.x), -(hc.y - player.pos.y)))*k*.6; }
+  if (G.beat === 'balance') player.pitch = lerp(player.pitch, .7, k);
+  if (G.beat === 'days'){ player.pitch = lerp(player.pitch, .2, k*.5); player.yaw += dt*.16; }
+  if (G.beat === 'lower') player.pitch = lerp(player.pitch, lerp(.5, .08, ease(G.lower)), k);
+  if (G.beat === 'finale'){ player.pitch = lerp(player.pitch, .16, k*.4); player.yaw += angDiff(player.yaw, Math.atan2(-(H0.x - player.pos.x), -(H0.y - player.pos.y)))*k*.3; }
+  const sh = G.shake; G.shake *= Math.exp(-dt*3);
+  camera.position.set(player.pos.x + (Math.random() - .5)*sh, player.eye + Math.sin(player.bob)*.035*player.vel + (Math.random() - .5)*sh, player.pos.y);
+  camera.rotation.set(player.pitch + (Math.random() - .5)*sh*.3, player.yaw, 0);
+  camera.fov = lerp(camera.fov, G.beat === 'lift' && inp.hold || G.beat === 'balance' ? 84 : 72, k*.5); camera.updateProjectionMatrix();
+  // the light turns with you, so the three tones read the same whichever way you look
+  const c = Math.cos(player.yaw), s = Math.sin(player.yaw), right = new V3(c, 0, -s), back = new V3(s, 0, c);
+  U.uLight.value.set(0, 0, 0).addScaledVector(right, .55).addScaledVector(UP, 1).addScaledVector(back, .3).normalize();
+  // hands live in the body frame: they tip with your gaze when you walk, and stay put while you hold the hill
+  const vmk = player.pose.startsWith('lift') ? 0 : .7;
+  vm.position.copy(camera.position); vm.rotation.set(player.pitch*vmk, player.yaw, 0, 'YXZ');
+  const r = poseHands(dt, player.pose);
+}
+
+/* ---------------- render: color pass, id/depth pass, ink + wobble + grain post-pass ---------------- */
+const post = new THREE.ShaderMaterial({
+  uniforms: { tCol: { value: rtCol.texture }, tId: { value: rtId.texture }, uRes: { value: new V2(1, 1) }, uWob: { value: 2.4 }, uGrain: { value: .8 }, uTime: { value: 0 },
+    uInk: { value: 1.15 }, uFlash: { value: 0 }, uPulse: { value: 0 }, uInkC: { value: hv(INK) }, uGlowC: { value: hv('#f6b93b') } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }`,
+  fragmentShader: `precision highp float;
+uniform sampler2D tCol; uniform sampler2D tId; uniform vec2 uRes; uniform float uWob; uniform float uGrain; uniform float uTime; uniform float uInk; uniform float uFlash; uniform float uPulse;
+uniform vec3 uInkC; uniform vec3 uGlowC; varying vec2 vUv;
+float h21(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x*p.y); }
+float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3. - 2.*f); return mix(mix(h21(i), h21(i + vec2(1., 0.)), f.x), mix(h21(i + vec2(0., 1.)), h21(i + vec2(1., 1.)), f.x), f.y); }
+float fbm(vec2 p){ return .55*vn(p) + .3*vn(p*2.07 + 7.1) + .15*vn(p*4.13 + 3.7); }
+float dId(vec4 s){ float g = floor(s.g*255. + .5); return floor(s.r*255. + .5) + mod(g, 128.)*256.; }
+float dH(vec4 s){ return step(127.5, floor(s.g*255. + .5)); }
+float dW(vec4 s){ float dz = s.b + s.a/255.; return dz <= 0. ? 0. : 1./max(exp2(dz*9.) - 1., .01); }
+void main(){
+  float S = uRes.y/800.; vec2 px = vUv*uRes, q = px/S; float boil = floor(uTime*4.);
+  vec2 disp = vec2(fbm(q*.022 + vec2(boil*5.3, 1.7)), fbm(q*.022 + vec2(31.7, boil*2.9))) - .5;
+  vec2 uv = (px + disp*uWob*3.4*S)/uRes;
+  vec3 col = texture2D(tCol, uv).rgb;
+  vec4 s0 = texture2D(tId, uv); float id0 = dId(s0), w0 = dW(s0), h0 = dH(s0); float z0 = w0 > 0. ? 1./w0 : 999.;
+  float r = uInk*S*clamp(1.5 - z0/45., .6, 1.3);
+  float ink = 0., hl = 0.;
+  for (int i = 0; i < 4; i++){ float an = float(i)*.7854; vec2 o = vec2(cos(an), sin(an))*r/uRes;
+    vec4 a = texture2D(tId, uv + o), b = texture2D(tId, uv - o); float ia = dId(a), ib = dId(b);
+    if (ia != id0 || ib != id0){ ink = 1.; hl = max(hl, max(h0, max(dH(a), dH(b)))); }
+    else if (id0 > .5){ float wa = dW(a), wb = dW(b); if (abs(wa + wb - 2.*w0) > .2*w0) ink = 1.; } }
+  if (id0 > .5){ float r2 = r*2.2;
+    for (int i = 0; i < 8; i++){ float an = float(i)*.7854 + .39; vec2 o = vec2(cos(an), sin(an))*r2/uRes; vec4 a = texture2D(tId, uv + o); float ia = dId(a);
+      if (ia != id0 && (ia < .5 || dW(a) < w0*.72)){ ink = 1.; hl = max(hl, h0); } } }
+  float glow = 0.;
+  if (uPulse > 0. && h0 < .5){ for (int i = 0; i < 12; i++){ float an = float(i)*.5236; glow += dH(texture2D(tId, uv + vec2(cos(an), sin(an))*10.*S/uRes)); } glow /= 12.; }
+  col = mix(col, vec3(1., .86, .45), clamp(glow*1.6, 0., 1.)*.55*uPulse);
+  col = mix(col, mix(uInkC, vec3(.93, .55, .12), hl*uPulse), ink);
+  float g = .5*vn(q*.9) + .3*vn(q*.37 + 9.1) + .2*h21(floor(px));
+  col *= mix(1., .82 + .26*g, uGrain);
+  col *= 1. - .06*uGrain*(fbm(q*.005) - .5);
+  col = mix(col, vec3(1., .985, .93), uFlash*.55);
+  gl_FragColor = vec4(col, 1.);
+}` });
+const postScene = new THREE.Scene(), postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), post));
+function resize(){ const dpr = Math.min(devicePixelRatio || 1, 1.5); renderer.setPixelRatio(dpr); renderer.setSize(innerWidth, innerHeight, false);
+  const v = renderer.getDrawingBufferSize(new V2()); rtCol.setSize(v.x, v.y); rtId.setSize(v.x, v.y); post.uniforms.uRes.value.copy(v);
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+function skyColor(){ return hv(PAPER).lerp(hv('#d9dad2'), G.storm).lerp(hv('#363a57'), G.night); }
+function render(){
+  const sky = skyColor();
+  renderer.setRenderTarget(rtCol); renderer.setClearColor(new THREE.Color(sky.x, sky.y, sky.z), 1); camera.layers.enableAll(); renderer.render(scene, camera);
+  IDPASS = true; renderer.setRenderTarget(rtId); renderer.setClearColor(0x000000, 0); camera.layers.set(0); scene.overrideMaterial = idMat; renderer.render(scene, camera);
+  scene.overrideMaterial = null; IDPASS = false; camera.layers.enableAll();
+  const pu = post.uniforms; pu.uWob.value = SET.wob; pu.uGrain.value = SET.grain; pu.uTime.value = G.t; pu.uFlash.value = G.flash; pu.uPulse.value = G.glowing.length ? .65 + .35*Math.sin(G.t*3.2) : 0;
+  renderer.setRenderTarget(null); renderer.render(postScene, postCam);
+  hud();
+}
+function hud(){
+  drawBubbles(); drawStats();
+  // a gentle arrow round the crosshair when what you need is off to one side
+  let showCue = false;
+  if (G.objTarget && !G.dlg && !camAuto()){ const t = G.objTarget(); if (t){ const p = t.clone().project(camera), behind = p.z > 1, off = behind || Math.abs(p.x) > .55 || Math.abs(p.y) > .7;
+    const far = Math.hypot(t.x - player.pos.x, t.z - player.pos.y);
+    if (off && (G.stuck > 3 || far > 10)){ let x = p.x, y = -p.y; if (behind){ x = -x; y = Math.abs(y) + .3; if (Math.abs(x) < .2) x = x < 0 ? -.4 : .4; }
+      const a = Math.atan2(y*innerHeight, x*innerWidth); $('cueArrow').setAttribute('transform', `rotate(${a*180/PI})`);
+      cueEl.style.transform = `translate(${Math.cos(a)*78}px,${Math.sin(a)*78}px)`; showCue = true; } } }
+  cueEl.classList.toggle('show', showCue);
+  const bal = BALANCE_BEATS.includes(G.beat); $('bal').classList.toggle('show', bal);
+  if (bal){ const b = G.bal.clone().clampLength(0, 1.45); $('balDot').setAttribute('cx', b.x*46); $('balDot').setAttribute('cy', b.y*46);
+    $('balDot').setAttribute('fill', G.bal.length() > 1 ? '#ef7157' : '#f6b93b');
+    const w = $('balWind'); if (G.gust){ w.setAttribute('opacity', '1'); w.setAttribute('transform', `rotate(${Math.atan2(G.gust.dir.y, G.gust.dir.x)*180/PI}) translate(-6 0)`); } else w.setAttribute('opacity', '0'); }
+  crossEl.style.opacity = bal || G.dlg ? 0 : 1;
+}
+
+/* ---------------- main loop ---------------- */
+let lastT = performance.now();
+function frame(now){ const dt = Math.min(.05, Math.max(0, (now - lastT)/1000)); lastT = now;
+  if (!G.selftestRunning){ update(dt); cameraStep(dt); render(); }
+  requestAnimationFrame(frame); }
+
+/* ---------------- hash states: jump to any beat with a set camera pose (for screenshots and demos) ---------------- */
+function settle(sec){ const n = Math.round(sec*30); for (let i = 0; i < n; i++){ update(1/30); cameraStep(1/30); } }
+function place(n, x, z, h){ n.pos.set(x, z); if (h != null) n.h = h; n.target = null; }
+const JUMP = {
+  village(){ startTalk(); },
+  talk(){ startTalk(); player.pos.set(1.2, 9.2); player.yaw = 0; talkNanda1(); G.dlg.i = 3; showLine(); },
+  offer(){ startTalk(); G.talked = { subala: true, yashoda: true }; startOffer(); player.pos.set(-4.6, 19.6); player.yaw = .25; player.pitch = -.18; },
+  storm(){ placed.visible = true; hill.garland.visible = true; startStorm(); G.storm = 1; G.stormT = 6; NPCS.forEach(n => place(n, n.d.storm[0], n.d.storm[1]));
+    player.pos.set(-3, -6); player.yaw = .08; player.pitch = .1; G.stuck = 25; G.nextBolt = 0.01; },
+  lift(){ JUMP.storm(); clearLater(); G.stuck = 0; player.pos.set(.5, -19); player.yaw = 0; startLift(); inp.hold = true; settle(2.6); inp.hold = false; },
+  held(){ JUMP.storm(); clearLater(); G.stuck = 0; player.pos.set(.5, -19); player.yaw = .2; startLift(); G.lift = 1; G.holdingHill = true; startBalance(); player.pitch = .7;
+    G.gust = { dir: new V2(-.8, -.6), t: .7, dur: 1.15 }; G.bal.set(-.3, -.2); NPCS.forEach(n => { if (['nanda', 'dhavali', 'dadi'].includes(n.d.id)){ n.heard = true; n.mode = 'safe'; } }); settle(.4); camera.fov = 84; },
+  shelter(){ JUMP.held(); startShelter(); G.bal.set(0, 0); G.gust = null; player.yaw = 2.2; player.pitch = .08;
+    NPCS.forEach(n => { if (['nanda', 'dhavali', 'dadi', 'yashoda', 'kapila'].includes(n.d.id)){ n.heard = true; n.mode = 'safe'; place(n, hill.pos.x + n.slot.x, hill.pos.z + n.slot.y); } });
+    inp.flute = true; settle(1.4); NPCS.forEach(n => { if (n.d.id === 'lalita' || n.d.id === 'calf'){ n.heard = true; n.mode = 'shelter'; } }); settle(1.2); inp.flute = true; },
+  days(){ JUMP.held(); NPCS.forEach(n => { n.heard = true; n.mode = 'safe'; place(n, hill.pos.x + n.slot.x, hill.pos.z + n.slot.y); }); settle(.2); startDays(); G.day = 4; G.dayLine = 3; G.dayT = .45; player.yaw = 1.2; player.pitch = .2; G.bal.set(.2, -.1); settle(.1); G.dayT = .5; },
+  rainbow(){ JUMP.days(); G.day = 7; startRelent(); G.storm = .1; G.rainbow = .9; G.night = 0; G.relentT = 4; settle(.3); clearLater();
+    NPCS.forEach((n, i) => { if (n.target){ n.pos.copy(n.target); n.target = null; n.mode = 'idle'; } });
+    player.pos.set(1.5, -15.5); startLower(); inp.hold = true; settle(2.6); inp.hold = false; player.yaw = -.05; player.pitch = .22; settle(.1); G.storm = 0; },
+  celebrate(){ clearLater(); placed.visible = true; hill.garland.visible = true; G.storm = 0; G.rainbow = .8; G.lower = 1;
+    NPCS.forEach((n, i) => { const a = PI*.12 + (i/(NPCS.length - 1))*PI*.76, r = n.cow ? 7.5 : 4.6; place(n, ANNA.x + r*1.2*Math.cos(a), ANNA.y + 1 + r*Math.sin(a)); n.mode = 'idle'; });
+    startCelebrate(); G.celebrateT = 6; player.pos.set(2.2, -6.5); player.yaw = Math.atan2(2.2 - ANNA.x, -6.5 - ANNA.y); player.pitch = -.06; settle(.4);
+    say(NPC.yashoda, 'Come, Kanha! Eat first, then play.', 5); },
+  end(){ JUMP.celebrate(); G.thanked = 3; G.beat = 'finale'; G.beatT = 4.8; settle(.5); },
+};
+function applyHash(){
+  const parts = location.hash.slice(1).split('&').filter(Boolean), name = parts[0];
+  if (name === 'selftest'){ G.started = true; selftest(); return; }
+  if (name && JUMP[name]){ G.started = true; $('title').hidden = true; JUMP[name]();
+    for (const q of parts.slice(1)){ const [k, v] = q.split('='); if (k === 'yaw') player.yaw = +v; if (k === 'pitch') player.pitch = +v; if (k === 'wob') SET.wob = +v; }
+    settle(.05); }
+  else { startTalk(); $('title').hidden = false; }
+}
+
+/* ---------------- self-test: drives every beat to the end with the same inputs a player uses ---------------- */
+async function selftest(){
+  G.selftestRunning = true; G.selftest = true; $('title').hidden = true; const log = [], T = $('test'); T.style.display = 'block';
+  const ok = (c, msg) => { log.push((c ? 'ok   ' : 'FAIL ') + msg); T.textContent = log.join('\n'); if (!c) throw new Error(msg); };
+  const run = (sec, f) => { const n = Math.round(sec*30); for (let i = 0; i < n; i++){ if (f && f()) return true; update(1/30); cameraStep(1/30); } return f ? !!f() : true; };
+  const go = (x, z) => { player.pos.set(x, z); run(.1); };
+  const face = p => { player.yaw = Math.atan2(-(p.x - player.pos.x), -(p.z !== undefined ? p.z - player.pos.y : p.y - player.pos.y)); };
+  const use = () => { const t = focusTarget(); if (!t) return false; t.use(); return true; };
+  const finishDlg = () => { let k = 0; while (G.dlg && k++ < 20) advance(); };
+  const autoBalance = () => { inp.mdx = -G.bal.x/.0042*.35; inp.mdy = -G.bal.y/.0042*.35; };
+  try {
+    startTalk(); ok(G.beat === 'talk', 'beat 1 starts: talk to Nanda Baba');
+    const near = n => { go(n.pos.x + 1.4, n.pos.y + 1.4); face(npcAt(n)); };
+    near(NPC.nanda); ok(use(), 'E on Nanda Baba opens the talk'); finishDlg(); ok(G.step === 1, 'Nanda sends you to ask Vraj');
+    near(NPC.subala); ok(use(), 'talk to Subala'); finishDlg(); near(NPC.yashoda); ok(use(), 'talk to Yashoda Maiya'); finishDlg();
+    ok(G.step === 2, 'both persuaded'); near(NPC.nanda); use(); finishDlg(); ok(G.beat === 'offer', 'beat 2: Annakut offerings');
+    for (const o of OFFERS){ go(o.g.position.x + 1.2, o.g.position.z + 1.2); face(o.g.position); ok(use(), 'take ' + o.name); }
+    go(ANNA.x, ANNA.y + 2.2); face(new V3(ANNA.x, 0, ANNA.y)); ok(use(), 'offer at the foot of Govardhan');
+    ok(run(12, () => G.beat === 'storm'), 'beat 3: Indra\'s storm begins'); run(5);
+    ok(G.storm > .9, 'storm is at full strength'); ok(NPCS.every(n => n.mode === 'panic'), 'villagers and cows scatter');
+    go(.5, -18.6); face(new V3(H0.x, 0, H0.y)); run(.2); ok(hillRho() < 1.3, 'at the foot of the hill');
+    inp.hold = true; ok(run(8, () => G.beat === 'balance'), 'beat 4: hold to lift the hill'); inp.hold = false;
+    ok(hill.pos.y > 2 && G.holdingHill, 'hill is up on the little finger, base at ' + hill.pos.y.toFixed(2) + ' m');
+    let worst = 0; ok(run(25, () => { autoBalance(); worst = Math.max(worst, G.bal.length()); return G.beat === 'shelter'; }), 'balanced through the gusts (worst ' + worst.toFixed(2) + ')');
+    ok(G.gusts >= 3, 'three gusts came and went');
+    for (let k = 0; k < 14 && G.beat === 'shelter'; k++){ const n = NPCS.find(m => !m.heard); if (!n) break; face(npcAt(n)); inp.flute = true; run(.6); inp.flute = false; }
+    ok(NPCS.every(n => n.heard), 'beat 5: every villager and cow heard the flute');
+    ok(run(40, () => G.beat === 'days'), 'everyone reached shelter: ' + G.safeN + ' of ' + NPCS.length);
+    ok(run(60, () => { autoBalance(); return G.beat === 'relent'; }), 'beat 6: seven days pass (day ' + G.day + ')');
+    ok(run(15, () => G.beat === 'lower'), 'Indra relents, rainbow ' + G.rainbow.toFixed(2));
+    inp.hold = true; ok(run(8, () => G.beat === 'celebrate'), 'hill set down gently'); inp.hold = false;
+    ok(hill.pos.distanceTo(new V3(H0.x, 0, H0.y)) < .05, 'hill back in its place');
+    run(4); ok(anna.foods.every(f => f.visible), 'beat 7: the Annakut is full');
+    for (let k = 0; k < 3; k++){ const n = PEOPLE.find(m => !G.talked['t_' + m.d.id]); near(n); ok(use(), 'thanks from ' + n.d.name); finishDlg(); }
+    ok(run(8, () => G.ended), 'ending card');
+    ok(ERR.length === 0, 'no script errors' + (ERR.length ? ': ' + ERR.join(' | ') : ''));
+    log.push('SELFTEST PASS'); document.title = 'SELFTEST PASS'; console.log('SELFTEST PASS\n' + log.join('\n'));
+  } catch (e){ log.push('SELFTEST FAIL: ' + e.message); document.title = 'SELFTEST FAIL'; console.log('SELFTEST FAIL\n' + log.join('\n')); }
+  T.textContent = log.join('\n'); $('end').hidden = true; G.selftestRunning = false; G.paused = false;
+}
+
+window.GAME = { G, player, NPC, hill, inp };
+applyHash(); cameraStep(1/30);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
