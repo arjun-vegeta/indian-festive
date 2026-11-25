@@ -6,6 +6,40 @@ Built at Festive Hacks 2026 (WeMakeDevs × WeAreDevelopers, Bengaluru). Everythi
 
 ![Festive Islands from above](shots/01-overview.jpg)
 
+## Demo video
+
+[![Watch the Festive Islands demo on YouTube](https://img.youtube.com/vi/yT-BzQL_7Eo/hqdefault.jpg)](https://youtu.be/yT-BzQL_7Eo)
+
+[Watch the demo on YouTube](https://youtu.be/yT-BzQL_7Eo)
+
+## What we used
+
+| Tool | What for |
+|---|---|
+| [Sarvam](https://www.sarvam.ai) | Character voices in English and Hindi |
+| [Flagsmith](https://www.flagsmith.com) | Feature flags and an A/B test in Dadi's courtyard, plus the switch for the failure demo |
+| [NudgeBee](https://nudgebee.com) | Events and alerting when a chapter fails to load |
+| [three.js](https://threejs.org) | The 3D engine for every island |
+
+### Sarvam: voices, generated once
+
+Every main conversation on all six islands, and Dadi's welcome, is voiced with Sarvam's Bulbul v3 text-to-speech, in English and Hindi. Each character has their own Sarvam voice. The voices are not generated live: we run `scripts/generate-narration.ts` once, it saves every line as an MP3 in `audio/`, and the game plays those files. The player never waits on an API call, and no API key ships with the game. We regenerate only when a line of dialogue changes.
+
+### Flagsmith: feature flags
+
+| Flag | Type | Why we use it |
+|---|---|---|
+| `home_festival_canopy` | On/off | Adds a striped festive canopy over Dadi's charpai. We can dress the courtyard for a festival day without a deploy. |
+| `home_rangoli_path` | On/off | Adds three rangoli patterns leading from the start to Dadi, to guide a new player to her. |
+| `home_garland_cue` | `quiet` or `glow` | An A/B test: does a glowing garland with drifting petals get more players to pick it up? Flagsmith records `home_viewed`, `garland_picked_up` and `dadi_spoken_to` for each visit. |
+| `govardhan_simulate_engine_failure` | On/off | Makes the Govardhan chapter fail to load on purpose, so we can demo the NudgeBee alert without breaking the real game. |
+
+If Flagsmith is slow or a flag is missing, the player gets the default courtyard and the game carries on.
+
+### NudgeBee: events and alerting
+
+When the Govardhan chapter's 3D engine fails to load, the player sees a clear error card and the failure is sent to NudgeBee as an event, with the chapter, time and failed module. NudgeBee raises the alert and can run a workflow, for example running the chapter's self-test in a real browser to check whether the live game is really broken. A small local server, `demo/govardhan.mjs`, keeps the webhook URL out of the browser. Setup steps are in the NudgeBee section below.
+
 ## The islands
 
 ### Home · Dadi's aangan
@@ -85,6 +119,7 @@ govardhan-fpv/      Govardhan Puja, first person (the engine the others copy)
 colorfigures/       isometric SVG prototype
 audio/              dialogue, narration manifests, playback
 scripts/            narration generator (Sarvam)
+demo/               local Govardhan server for the NudgeBee incident demo
 tests/              audio tests
 DESIGN.md           the visual language
 hub-NOTES.md        hub mechanics, hash states, self-test
@@ -121,7 +156,9 @@ open -a "Google Chrome" holi-prahlad/index.html
 | R | Replay the current voiced line |
 | Esc or P | Pause: volume, narration language, wobble, progress |
 
-## Audio and narration
+## Sarvam · voices in English and Hindi
+
+Every main conversation is voiced with Sarvam's Bulbul v3 text-to-speech, and each character has their own voice.
 
 Begin plays a short Apple Music cue in the hub, Dussehra, Diwali, and Govardhan. The pause menu saves Voice, Music, and Effects levels across islands. Holi, Ganesh Chaturthi, and Durga Puja share the voice and effects controls. Narration language switches voiced dialogue and subtitles between English and हिन्दी.
 
@@ -136,6 +173,38 @@ node --experimental-strip-types scripts/generate-narration.ts en-IN
 ```bash
 node --experimental-strip-types scripts/generate-narration.ts hi-IN
 ```
+
+## Flagsmith · courtyard experiments
+
+Dadi's courtyard is dressed by Flagsmith flags, so the team can change it and run an experiment without a deploy. `courtyard-flags.js` loads the Flagsmith SDK and identifies each player with a random ID kept in local storage.
+
+| Flag | Type | What it does |
+|---|---|---|
+| `home_festival_canopy` | Boolean | A striped cloth canopy over Dadi's charpai |
+| `home_rangoli_path` | Boolean | Three rangoli patterns leading from the spawn to Dadi |
+| `home_garland_cue` | String, `quiet` or `glow` | The garland stool beside Dadi: at rest, or with a warm glow and drifting petals |
+
+The garland flag is an A/B test: does a glowing garland get more players to pick it up? Entering the courtyard sends `home_viewed`, and the first interaction sends `garland_picked_up` or `dadi_spoken_to`, with the variant and both decoration switches attached. If Flagsmith is slow (over 2.5 s) or the flag is missing, the player sees the quiet garland and the visit is left out of the experiment. Reload the hub, or open `index.html#home`, to see a change. Setup for the warehouse and experiment is in [`hub-NOTES.md`](hub-NOTES.md).
+
+## NudgeBee · loading incidents
+
+If a chapter fails to load, the team should hear about it before a player does. The Govardhan chapter catches a failed 3D-engine load, shows the player a clear error card, and reports the failure to a NudgeBee webhook through a small local server (`demo/govardhan.mjs`). The server keeps the webhook URL secret, accepts reports only from its own page, and forwards one incident with the chapter, timestamp, simulation marker and failed module. A Flagsmith flag, `govardhan_simulate_engine_failure`, triggers the failure on demand for the demo.
+
+### Record the NudgeBee loading incident
+
+Use the deployed Govardhan chapter as the healthy comparison. For the recording, the local demo server serves the same chapter and reads its simulation flag from the Flagsmith environment you choose. A plain static copy skips the simulation. The courtyard flags keep their existing configuration.
+
+1. In Flagsmith, create the Boolean flag `govardhan_simulate_engine_failure`, disabled by default. Enable it in your demo environment. The demo uses the existing public client key in `FLAGSMITH_API_KEY`. Set `FLAGSMITH_DEMO_ENVIRONMENT_KEY` only to select another environment.
+2. For the event-only demo, set `NUDGEBEE_EVENT_WEBHOOK_URL` in `.env` to the generated Event Webhook URL. For a workflow demo instead, leave that variable unset. In NudgeBee, create an Automation Webhook, link it to a workflow's Webhook trigger, save and activate the workflow, and copy its generated URL into `NUDGEBEE_WEBHOOK_URL` in `.env`. The local server holds this secret. [Automation Webhook setup](https://docs.nudgebee.com/docs/integrations/Webhooks/automation_webhook/)
+3. Run the server (Node 22+) from the repo root, then open [local Govardhan](http://127.0.0.1:4173/govardhan-fpv/). Every new page load reads the flag. When enabled, the browser requests a deliberately missing engine module, displays a persistent error, and sends one report automatically. When disabled or when Flagsmith is unreachable, the chapter loads normally.
+
+   ```bash
+   node --env-file=.env demo/govardhan.mjs
+   ```
+
+4. Record the playable deployed chapter, the local error, then the corresponding run in NudgeBee's history. The webhook payload includes the chapter, timestamp, simulation marker and failed module. A delivery acknowledgement in the game means the webhook accepted the report. Use the workflow history to see what ran.
+
+For independent verification, configure a workflow step to run a WebGL-capable browser against the public deployed `govardhan-fpv/index.html#selftest` URL. Wait for the page title to become `SELFTEST PASS` or `SELFTEST FAIL` and pass the observed result to the summary step together with the webhook payload. Report a probe timeout as inconclusive. A successful HTTP fetch of the HTML alone cannot verify that the chapter rendered.
 
 ## Test
 
@@ -157,14 +226,3 @@ Hash states like `#overview`, `#album=holi-prahlad`, `#fire` or `#dahan` jump st
 ## AI tools
 
 Built with Claude Code. The mythology and festival details are listed in each `NOTES.md` for a practising family to check.
-
-## Record the NudgeBee loading incident
-
-Use the deployed Govardhan chapter as the healthy comparison. For the recording, the local demo server serves the same chapter and reads its simulation flag from the Flagsmith environment you choose. A plain static copy skips the simulation. The courtyard flags keep their existing configuration.
-
-1. In Flagsmith, create the Boolean flag `govardhan_simulate_engine_failure`, disabled by default. Enable it in your demo environment. The demo uses the existing public client key in `FLAGSMITH_API_KEY`. Set `FLAGSMITH_DEMO_ENVIRONMENT_KEY` only to select another environment.
-2. For the event-only demo, set `NUDGEBEE_EVENT_WEBHOOK_URL` to the generated Event Webhook URL. For a workflow demo instead, leave that variable unset. In NudgeBee, create an Automation Webhook, link it to a workflow’s Webhook trigger, save and activate the workflow, and copy its generated URL into `NUDGEBEE_WEBHOOK_URL` in the same file. The local server holds this secret. [Automation Webhook setup](https://docs.nudgebee.com/docs/integrations/Webhooks/automation_webhook/)
-3. Run `node --env-file=.env demo/govardhan.mjs` (Node 22+) from the repo root. Open [local Govardhan](http://127.0.0.1:4173/govardhan-fpv/). Every new page load reads the flag. When enabled, the browser requests a deliberately missing engine module, displays a persistent error, and sends one report automatically. When disabled or when Flagsmith is unreachable, the chapter loads normally.
-4. Record the playable deployed chapter, the local error, then the corresponding run in NudgeBee’s history. The webhook payload includes the chapter, timestamp, simulation marker and failed module. A delivery acknowledgement in the game means the webhook accepted the report. Use the workflow history to see what ran.
-
-For independent verification, configure a workflow step to run a WebGL-capable browser against the **public deployed** `govardhan-fpv/index.html#selftest` URL. Wait for the page title to become `SELFTEST PASS` or `SELFTEST FAIL` and pass the observed result to the summary step together with the webhook payload. Report a probe timeout as inconclusive. A successful HTTP fetch of the HTML alone cannot verify that the chapter rendered.
