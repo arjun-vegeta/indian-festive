@@ -1204,5 +1204,33 @@ window.GAME = { G, player, NPC, hill, inp };
 applyHash(); cameraStep(1/30);
 requestAnimationFrame(frame);
 </script>
+<script>
+/* Pause menu: "Back to Dadi" returns to the hub courtyard; "Choose another story" lists every story island to jump to. */
+(function(){
+  const STORIES = [['holi-prahlad', 'Holi', 'Prahlad and Holika'], ['ganesh-race', 'Ganesh Chaturthi', "Ganesha's race"], ['durga-mahishasura', 'Durga Puja', 'Durga and Mahishasura'],
+    ['dussehra-rama', 'Dussehra', 'Rama and Ravana'], ['diwali-ayodhya', 'Diwali', 'Rama comes home'], ['govardhan-fpv', 'Govardhan Puja', 'Krishna lifts the hill']];
+  const parts = location.pathname.split('/').filter(Boolean); let here = parts[parts.length - 1] || ''; if (here.endsWith('.html')) here = parts[parts.length - 2] || '';
+  const restart = document.getElementById('restart'); if (!restart) return;
+  const row = restart.parentNode; row.style.flexWrap = 'wrap';
+  const mk = (t, id) => { const b = document.createElement('button'); b.type = 'button'; b.id = id; b.textContent = t; return b; };
+  const toDadi = mk('Back to Dadi', 'toDadi'), pick = mk('Choose another story', 'pickStory');
+  row.insertBefore(toDadi, restart); row.insertBefore(pick, restart);
+  const list = document.createElement('div'); list.id = 'storyList'; list.style.cssText = 'display:none;flex-wrap:wrap;gap:8px;margin-top:12px;justify-content:flex-end';
+  // the paper sheet comes down, a one-line title shows, then the next page loads (the same leaving fade the islands use)
+  function leave(url, text){ const f = document.createElement('div');
+    f.style.cssText = 'position:fixed;inset:0;z-index:999;background:#f4efe3;opacity:0;transition:opacity .6s ease;display:flex;align-items:center;justify-content:center;'
+      + 'font:800 clamp(22px,3.4vw,38px)/1.2 "Baloo 2",ui-rounded,system-ui,sans-serif;color:#2a2118;text-align:center;padding:24px';
+    f.textContent = text; document.body.appendChild(f); requestAnimationFrame(() => requestAnimationFrame(() => { f.style.opacity = '1'; }));
+    try { if (document.pointerLockElement) document.exitPointerLock(); } catch (e) {}
+    setTimeout(() => { location.href = url; }, 650); }
+  for (const [id, fest, story] of STORIES){ const b = mk(`${fest} · ${story}`, 'story-' + id); b.style.fontSize = '13.5px'; b.style.padding = '2px 12px';
+    if (id === here){ b.disabled = true; b.style.opacity = '.45'; b.style.cursor = 'default'; b.textContent += ' (you are here)'; }
+    else b.onclick = () => leave(`../${id}/index.html#from=hub`, `${fest} · ${story}`);
+    list.appendChild(b); }
+  row.parentNode.insertBefore(list, row.nextSibling);
+  toDadi.onclick = () => leave('../index.html#home', 'Back to Dadi');
+  pick.onclick = () => { list.style.display = list.style.display === 'none' ? 'flex' : 'none'; };
+})();
+</script>
 </body>
 </html>
