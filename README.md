@@ -6,6 +6,40 @@ Built at Festive Hacks 2026 (WeMakeDevs × WeAreDevelopers, Bengaluru). Everythi
 
 ![Festive Islands from above](shots/01-overview.jpg)
 
+## Demo video
+
+[![Watch the Festive Islands demo on YouTube](https://img.youtube.com/vi/yT-BzQL_7Eo/hqdefault.jpg)](https://youtu.be/yT-BzQL_7Eo)
+
+[Watch the demo on YouTube](https://youtu.be/yT-BzQL_7Eo)
+
+## What we used
+
+| Tool | What for |
+|---|---|
+| [Sarvam](https://www.sarvam.ai) | Character voices in English and Hindi |
+| [Flagsmith](https://www.flagsmith.com) | Feature flags and an A/B test in Dadi's courtyard, plus the switch for the failure demo |
+| [NudgeBee](https://nudgebee.com) | Events and alerting when a chapter fails to load |
+| [three.js](https://threejs.org) | The 3D engine for every island |
+
+### Sarvam: voices, generated once
+
+Every main conversation on all six islands, and Dadi's welcome, is voiced with Sarvam's Bulbul v3 text-to-speech, in English and Hindi. Each character has their own Sarvam voice. The voices are not generated live: we run `scripts/generate-narration.ts` once, it saves every line as an MP3 in `audio/`, and the game plays those files. The player never waits on an API call, and no API key ships with the game. We regenerate only when a line of dialogue changes.
+
+### Flagsmith: feature flags
+
+| Flag | Type | Why we use it |
+|---|---|---|
+| `home_festival_canopy` | On/off | Adds a striped festive canopy over Dadi's charpai. We can dress the courtyard for a festival day without a deploy. |
+| `home_rangoli_path` | On/off | Adds three rangoli patterns leading from the start to Dadi, to guide a new player to her. |
+| `home_garland_cue` | `quiet` or `glow` | An A/B test: does a glowing garland with drifting petals get more players to pick it up? Flagsmith records `home_viewed`, `garland_picked_up` and `dadi_spoken_to` for each visit. |
+| `govardhan_simulate_engine_failure` | On/off | Makes the Govardhan chapter fail to load on purpose, so we can demo the NudgeBee alert without breaking the real game. |
+
+If Flagsmith is slow or a flag is missing, the player gets the default courtyard and the game carries on.
+
+### NudgeBee: events and alerting
+
+When the Govardhan chapter's 3D engine fails to load, the player sees a clear error card and the failure is sent to NudgeBee as an event, with the chapter, time and failed module. NudgeBee raises the alert and can run a workflow, for example running the chapter's self-test in a real browser to check whether the live game is really broken. A small local server, `demo/govardhan.mjs`, keeps the webhook URL out of the browser. Setup steps are in the NudgeBee section below.
+
 ## The islands
 
 ### Home · Dadi's aangan
