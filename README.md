@@ -92,11 +92,11 @@ open -a "Google Chrome" govardhan-fpv/index.html
 
 ## Audio and narration
 
-Select Begin to hear a short Apple Music preview chosen for each island. Each story brings its cue back once at a transition. The pause menu saves separate Voice, Music and Effects levels across islands. Narration language switches voiced dialogue and subtitles between English and हिन्दी.
+Begin plays a short Apple Music cue in the hub, Dussehra, Diwali, and Govardhan. The pause menu saves Voice, Music, and Effects levels across islands. Holi, Ganesh Chaturthi, and Durga Puja share the voice and effects controls. Narration language switches voiced dialogue and subtitles between English and हिन्दी.
 
-Dialogue is authored in `audio/dialogue.js` and `audio/dialogue-hindi.js`. Voices and transition cues are configured in `scripts/generate-narration.ts`. If a clip is missing, the player still sees the authored text.
+Dialogue is authored in `audio/dialogue.js` and `audio/dialogue-hindi.js`. The main conversations in all six islands and Dadi's welcome have recorded voices. Voices and transition cues are configured in `scripts/generate-narration.ts`. If a clip is missing, the player still sees the authored text.
 
-Generating narration needs Node 22.15+, FFmpeg on PATH and `SARVAM_API_KEY` in your environment.
+Generating narration needs Node 22.15+, FFmpeg on PATH and `SARVAM_API_KEY` in your environment. To regenerate specific lines, append their cue IDs after the language, for example `en-IN dadiIntro-5`.
 
 ```bash
 node --experimental-strip-types scripts/generate-narration.ts en-IN

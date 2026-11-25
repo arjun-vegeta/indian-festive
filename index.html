@@ -1146,19 +1146,6 @@ function showLine(){ const [who] = G.dlg.lines[G.dlg.i], you = who === 'you';
 function advance(){ if (!G.dlg) return; festivalAudio.stopDialogue(); G.dlg.i++; if (G.dlg.i >= G.dlg.lines.length){ const f = G.dlg.done; G.dlg = null; dlgEl.style.display = 'none'; if (f) f(); } else showLine(); }
 
 /* ---------------- Dadi, the journey and progress ---------------- */
-const Y = 'you';
-const INTRO = [
-  ['Dadi', 'There you are, beta. Come, sit with your Dadi a moment.'],
-  [Y, 'Dadi, what are all those islands floating out there?'],
-  ['Dadi', 'Each island is a story. Each story is behind a festival.'],
-  ['Dadi', 'When you step onto an island, you become the hero of its story.'],
-  ['Dadi', 'The stones go round the year. First comes Holi, in spring.'],
-  ['Dadi', 'Then Ganesh Chaturthi, in the rains.'],
-  ['Dadi', 'Then Durga Puja. It ends on Dussehra day, so those two islands sit side by side.'],
-  ['Dadi', 'About twenty days later comes Diwali. The very next day is Govardhan Puja.'],
-  ['Dadi', 'That is the order I like. But every island is open. Go where your feet take you.'],
-  [Y, 'I will start with Holi, Dadi!'],
-];
 // what Dadi says about a story you have just walked: a bubble from the screen edge as you arrive, and the first line in her album
 const DONE_LINES = {
   'holi-prahlad': 'Holi hai! Prahlad kept his faith, and the fire could not touch him.',
@@ -1196,7 +1183,7 @@ function enterCourtyard(){
 // at the festival that comes next
 function talkDadi(){
   courtyardFlags.choose('dadi_spoken_to');
-  if (!G.introDone){ dialog(DADI, INTRO, () => { G.introDone = true; refreshObjective(); openAlbum(targetStory() || ORDER[0]); }); return; }
+  if (!G.introDone){ dialog(DADI, festivalDialogue.dadiIntro, () => { G.introDone = true; refreshObjective(); openAlbum(targetStory() || ORDER[0]); }); return; }
   if (G.lastDone && !G.toldDone){ G.toldDone = true; const all = !nextStory();
     dialog(DADI, [['Dadi', all ? ALL_DONE : DONE_LINES[G.lastDone]]], () => openAlbum(all ? ORDER[0] : follows(G.lastDone) || ORDER[0])); return; }
   if (!openAlbum(targetStory() || ORDER[0])){ const n = targetStory(); dialog(DADI, [['Dadi', n ? `Next is ${STORY[n].fest}: ${STORY[n].story}. Follow the glowing stones, beta.` : ALL_DONE]], null); } }
@@ -1553,7 +1540,7 @@ async function selftest(){
     ok(!garlandCue.visible && !targets().some(t => t.obj === flowers), 'the cue and pickup prompt clear after the gift');
     startHome();
     const dw = dadiWorld(), df = new V3(0, 0, 1.5).applyQuaternion(DADI.g.getWorldQuaternion(new THREE.Quaternion()));
-    ok(walkTo(dw.x + df.x, dw.z + df.z, .5), 'walked up to Dadi'); face(dw); ok(use() && G.dlg && G.dlg.lines === INTRO, 'E on Dadi starts her intro (' + INTRO.length + ' lines)');
+    ok(walkTo(dw.x + df.x, dw.z + df.z, .5), 'walked up to Dadi'); face(dw); ok(use() && G.dlg && G.dlg.lines === festivalDialogue.dadiIntro, 'E on Dadi starts her intro (' + festivalDialogue.dadiIntro.length + ' lines)');
     finishDlg(); ok(G.introDone && albumOpen() && st().key === 'holi', 'after the intro, Dadi opens her photo album at Holi');
     { const p0 = player.pos.clone(), y0 = player.yaw; inp.f = 1; inp.mdx = 80; run(.5); inp.f = 0; ok(player.pos.distanceTo(p0) < 1e-6 && player.yaw === y0 && !promptHTML, 'no walking, looking or E prompt while the album is open'); }
     A.tab('dussehra'); ok(st().key === 'dussehra', 'the Dussehra tab jumps to Dussehra');

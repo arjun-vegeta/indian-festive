@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { runInNewContext } from 'node:vm';
@@ -29,6 +29,23 @@ const voices: Record<string, string> = {
   'Nanda Baba': 'anand',
   Subala: 'manan',
   'Yashoda Maiya': 'neha',
+  Narada: 'aditya',
+  Kartikeya: 'rohan',
+  Parvati: 'priya',
+  Mushak: 'manan',
+  'Kumbhar Kaka': 'anand',
+  Indra: 'aditya',
+  Brahma: 'anand',
+  Vishnu: 'shubh',
+  Shiva: 'dev',
+  Himavan: 'rahul',
+  Mahishasura: 'varun',
+  Thakuma: 'kavya',
+  'King Hiranyakashipu': 'dev',
+  Courtiers: 'varun',
+  Holika: 'ritu',
+  'Queen Kayadhu': 'neha',
+  Dadaji: 'anand',
 };
 const playerVoices: Record<string, string> = {
   dadiIntro: 'aayan',
@@ -39,6 +56,16 @@ const playerVoices: Record<string, string> = {
   nandaDebate: 'aayan',
   subalaDebate: 'aayan',
   yashodaDebate: 'aayan',
+  ganeshMango: 'aayan',
+  ganeshMushak: 'aayan',
+  ganeshParents: 'aayan',
+  durgaLion: 'simran',
+  durgaBattle: 'simran',
+  durgaHome: 'simran',
+  holiThrone: 'aayan',
+  holiOrder: 'aayan',
+  holiMother: 'aayan',
+  holiFestival: 'aayan',
 };
 
 export function narrationCues(language: Language = 'en-IN') {
@@ -65,11 +92,13 @@ export function narrationCues(language: Language = 'en-IN') {
   return cues;
 }
 
-export async function synthesizeNarration(apiKey: string, request = fetch, language: Language = 'en-IN') {
+export async function synthesizeNarration(
+  apiKey: string, request = fetch, language: Language = 'en-IN', cues = narrationCues(language),
+) {
   if (!apiKey) throw new Error('Set SARVAM_API_KEY in the environment to generate narration.');
 
   const clips = new Map<string, Buffer>();
-  for (const [id, { speaker, text }] of narrationCues(language)) {
+  for (const [id, { speaker, text }] of cues) {
     const response = await request('https://api.sarvam.ai/text-to-speech', {
       method: 'POST',
       headers: { 'api-subscription-key': apiKey, 'Content-Type': 'application/json' },
@@ -115,15 +144,24 @@ async function main() {
   const language = process.argv[2] ?? 'en-IN';
   if (language !== 'en-IN' && language !== 'hi-IN') throw new Error('Expected en-IN or hi-IN.');
   const isHindi = language === 'hi-IN';
-  const clips = await synthesizeNarration(process.env.SARVAM_API_KEY ?? '', fetch, language);
-  for (const [id, audio] of clips) clips.set(id, normalizeNarration(audio, id));
+  const cues = narrationCues(language);
+  const requested = new Set(process.argv.slice(3));
+  for (const id of requested) {
+    if (!cues.has(id)) throw new Error(`Unknown narration cue: ${id}.`);
+  }
   const directory = new URL('../audio/', import.meta.url);
   const manifest: Record<string, string> = {};
-  for (const [id, audio] of clips) {
+  for (const [id] of cues) {
     const filename = `${id}${isHindi ? '-hi' : ''}.mp3`;
-    await writeFile(new URL(filename, directory), audio);
+    if (requested.size && !requested.has(id) && !existsSync(new URL(filename, directory))) {
+      throw new Error(`Include ${id} in this run because ${filename} is missing.`);
+    }
     manifest[id] = filename;
   }
+  const selected = requested.size ? new Map([...cues].filter(([id]) => requested.has(id))) : cues;
+  const clips = await synthesizeNarration(process.env.SARVAM_API_KEY ?? '', fetch, language, selected);
+  for (const [id, audio] of clips) clips.set(id, normalizeNarration(audio, id));
+  for (const [id, audio] of clips) await writeFile(new URL(manifest[id], directory), audio);
   const filename = isHindi ? 'narration-hi.js' : 'narration.js';
   const variable = isHindi ? 'festivalNarrationHindi' : 'festivalNarration';
   await writeFile(new URL(filename, directory),
