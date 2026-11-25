@@ -1,0 +1,1365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Diwali, as Rama</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&display=swap" rel="stylesheet">
+<!--
+  Diwali · Rama comes home, played as Rama in first person. Festive Hacks, Bengaluru, Nov 2026. Island 2 of the Festival Islands.
+
+  The engine (toon shader, id/depth ink pass, wobble and grain, flat shadows, figurines, HUD, hints, sound) is copied from
+  ../govardhan-fpv/index.html and the scene and story are new. The look is inspired by Colorfigures by April Zhu,
+  https://april-zhu.com/colorfigures (MIT licence, Copyright (c) 2026 April Zhu). No Colorfigures code is copied.
+  Every shape is a real 3D mesh built in code: no images, sprites, billboards or textures.
+-->
+<style>
+  :root{--paper:#f4efe3;--ink:#2a2118;--muted:#8a7f6c;--rule:#dcd3c1;--accent:#f6b93b;--note:#fff1bf;--kb:#2e4278}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden;background:#363a57;color:var(--ink);
+    font:16px/1.4 "Baloo 2",ui-rounded,system-ui,-apple-system,sans-serif}
+  #c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;outline:none}
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:2;overflow:hidden}
+  #obj{position:absolute;top:14px;left:50%;transform:translateX(-50%);background:var(--paper);border:1.7px solid var(--ink);
+    border-radius:999px;box-shadow:3px 3px 0 var(--ink);padding:3px 18px 3px 14px;font-weight:700;font-size:17px;white-space:nowrap;
+    max-width:min(760px,calc(100vw - 32px));overflow:hidden;text-overflow:ellipsis;transition:background-color .4s}
+  #obj .k{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-right:9px;font-weight:800}
+  #obj.new{background:var(--accent)}
+  #obj:empty{display:none}
+  #hint{position:absolute;top:60px;left:50%;transform:translate(-50%,-4px);background:var(--note);border:1.5px solid var(--ink);
+    border-radius:10px;box-shadow:3px 3px 0 var(--ink);padding:4px 14px;font-weight:600;font-size:15px;opacity:0;
+    transition:opacity .4s,transform .4s;max-width:min(620px,calc(100vw - 32px));text-align:center}
+  #hint.show{opacity:1;transform:translate(-50%,0)}
+  #cross{position:absolute;left:50%;top:50%;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;border:2px solid var(--ink);border-radius:50%;
+    background:var(--paper);transition:transform .15s}
+  #cross.on{transform:scale(1.5);background:var(--accent)}
+  #prompt{position:absolute;left:50%;top:calc(50% + 30px);transform:translateX(-50%);display:flex;align-items:center;gap:8px;background:var(--paper);
+    border:1.6px solid var(--ink);border-radius:999px;padding:3px 15px 3px 5px;font-weight:700;font-size:16px;box-shadow:2px 2px 0 var(--ink);
+    opacity:0;transition:opacity .2s;white-space:nowrap}
+  #prompt.show{opacity:1}
+  .key{display:inline-block;min-width:26px;height:26px;border:1.6px solid var(--ink);border-radius:7px;background:var(--accent);text-align:center;
+    line-height:23px;font-size:13.5px;font-weight:800;padding:0 6px;box-shadow:0 2px 0 var(--ink)}
+  #cue{position:absolute;left:50%;top:50%;opacity:0;transition:opacity .5s}
+  #cue.show{opacity:1}
+  #cue svg{position:absolute;left:-17px;top:-17px;overflow:visible}
+  #stats{position:absolute;top:12px;right:18px;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+  .stat{text-align:right;text-shadow:0 0 3px var(--paper),0 0 6px var(--paper),0 0 10px var(--paper)}
+  .stat .k{font-size:11.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .stat .v{font-size:32px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+  .night .stat .k,.night .stat .v{color:var(--paper);text-shadow:0 0 4px var(--ink),0 0 8px var(--ink)}
+  .bub{position:absolute;left:0;top:0;transform:translate(-50%,-100%);background:var(--paper);border:1.6px solid var(--ink);border-radius:12px;
+    box-shadow:2px 2px 0 var(--ink);padding:2px 11px 4px;font-size:15px;font-weight:600;width:max-content;max-width:250px;text-align:center;line-height:1.25;
+    opacity:0;transition:opacity .25s}
+  .bub b{display:block;font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);font-weight:800}
+  .bub::after{content:"";position:absolute;left:50%;bottom:-7px;width:10px;height:10px;margin-left:-6px;background:var(--paper);
+    border-right:1.6px solid var(--ink);border-bottom:1.6px solid var(--ink);transform:rotate(45deg)}
+  .bub.el::after{left:-6px;top:50%;bottom:auto;margin:-6px 0 0;transform:rotate(135deg)}
+  .bub.er::after{left:auto;right:-7px;top:50%;bottom:auto;margin:-6px 0 0;transform:rotate(-45deg)}
+  .bub.el,.bub.er{background:var(--note)}
+  .label{position:absolute;left:0;top:0;transform:translate(-50%,-50%);background:var(--paper);border:1.7px solid var(--ink);border-radius:10px;
+    box-shadow:2px 2px 0 var(--ink);padding:0 12px 2px;font-weight:800;font-size:22px;line-height:1.2;text-align:center;opacity:0;transition:opacity .4s;white-space:nowrap}
+  .label small{display:block;font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
+  #dlg{position:absolute;left:50%;bottom:24px;transform:translateX(-50%);width:min(660px,calc(100vw - 32px));background:var(--paper);
+    border:2px solid var(--ink);border-radius:16px;box-shadow:5px 5px 0 var(--ink);padding:10px 18px 8px;display:none;pointer-events:auto}
+  #dlg .who{font-weight:800;font-size:12.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+  #dlg .who.you{color:var(--kb)}
+  #dlg .line{font-size:20px;line-height:1.35;margin:1px 0 4px;font-weight:600}
+  #dlg .more{font-size:12.5px;color:var(--muted);text-align:right;font-weight:700}
+  #cap{position:absolute;left:50%;bottom:58px;transform:translateX(-50%);font-weight:800;font-size:26px;color:var(--paper);text-align:center;
+    text-shadow:0 0 5px var(--ink),0 0 10px var(--ink),0 0 18px var(--ink);opacity:0;transition:opacity 1s;max-width:calc(100vw - 32px)}
+  #cap small{display:block;font-size:17px;font-weight:600}
+  #cap.show{opacity:1}
+  .card{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(42,33,24,.34);z-index:10;padding:16px}
+  .card[hidden]{display:none}
+  .card .in{background:var(--paper);border:2px solid var(--ink);border-radius:18px;box-shadow:6px 6px 0 var(--ink);max-width:580px;width:100%;
+    padding:20px 24px 18px;max-height:92vh;overflow:auto}
+  .card h2{margin:0 0 2px;font-size:30px;line-height:1.15;font-weight:800}
+  .card .sub{color:var(--muted);margin:0 0 12px;font-size:16px}
+  .card ul{margin:0 0 14px;padding-left:0;list-style:none}
+  .card li{margin:0 0 7px;display:flex;gap:10px;align-items:baseline}
+  .card li .key{flex:none}
+  .card ul.why li{display:block;padding-left:16px;position:relative;margin:0 0 6px;font-size:15.5px;line-height:1.35}
+  .card ul.why li::before{content:"";position:absolute;left:0;top:.55em;width:7px;height:7px;border-radius:50%;background:var(--accent);border:1.4px solid var(--ink)}
+  .card .row{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+  .card .q{font-size:19px;line-height:1.4;margin:6px 0 14px;font-weight:600}
+  .card .next{font-weight:800;font-size:17px;margin:0 0 14px;background:var(--note);border:1.5px solid var(--ink);border-radius:10px;padding:4px 12px}
+  .card .cr{font-size:12.5px;color:var(--muted);margin:12px 0 0}
+  .card .cr a{color:inherit}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 14px}
+  .chip{border:1.6px solid var(--ink);border-radius:999px;padding:1px 12px 3px;background:#fff8e2;font-size:13.5px;font-weight:600;color:var(--muted)}
+  .chip b{font-size:18px;margin-right:6px;color:var(--ink)}
+  button{font:inherit;font-weight:700;font-size:15px;color:var(--ink);background:var(--paper);border:1.7px solid var(--ink);border-radius:999px;
+    padding:4px 18px;cursor:pointer;line-height:1.5}
+  button:hover{background:#ece5d4}
+  button.go{background:var(--accent);box-shadow:3px 3px 0 var(--ink)}
+  button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+  .sets{display:grid;grid-template-columns:1fr 1fr;gap:10px 22px;border-top:1px solid var(--rule);padding-top:12px;margin:0 0 14px}
+  .sets label{display:block;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:800;margin-bottom:2px}
+  input[type=range]{width:100%;accent-color:var(--ink)}
+  #veil{position:fixed;inset:0;z-index:40;background:var(--paper);display:flex;align-items:center;justify-content:center;opacity:1;transition:opacity .6s;pointer-events:auto}
+  #veil.off{opacity:0;pointer-events:none}
+  #veil svg{position:absolute;inset:0;width:100%;height:100%}
+  #veil .t{position:relative;font-weight:800;font-size:clamp(24px,4vw,40px);line-height:1.2;color:var(--ink);text-align:center;padding:0 24px;max-width:900px}
+  #test{position:fixed;left:12px;bottom:12px;z-index:20;background:var(--paper);border:2px solid var(--ink);border-radius:12px;box-shadow:4px 4px 0 var(--ink);
+    padding:8px 12px;font:600 12.5px/1.3 ui-monospace,Menlo,monospace;max-width:560px;max-height:calc(100vh - 24px);overflow:auto;display:none;white-space:pre-wrap}
+  #fatal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:30;padding:20px;text-align:center;font-size:18px;background:var(--paper)}
+  @media (max-width:700px){ #obj{font-size:14.5px;top:10px} #obj .k{display:none} .stat .v{font-size:22px} #dlg .line{font-size:17px} .sets{grid-template-columns:1fr} #cap{font-size:20px} }
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
+</head>
+<body>
+<canvas id="c" tabindex="0" aria-label="First-person view of the road home to Ayodhya"></canvas>
+<div id="hud">
+  <div id="obj"></div>
+  <div id="hint"></div>
+  <div id="stats"></div>
+  <div id="cross"></div>
+  <div id="cue"><svg width="34" height="34" viewBox="-17 -17 34 34"><g id="cueArrow"><path d="M-6 -11 L8 0 L-6 11 L-2 0 Z" fill="#f6b93b" stroke="#2a2118" stroke-width="2.4" stroke-linejoin="round"/></g></svg></div>
+  <div id="prompt"></div>
+  <div id="cap"></div>
+  <div id="dlg" role="dialog" aria-live="polite"><div class="who" id="dlgWho"></div><div class="line" id="dlgLine"></div><div class="more">E, Space or click to go on</div></div>
+</div>
+
+<div class="card" id="title" hidden>
+  <div class="in">
+    <h2>Diwali · Rama comes home</h2>
+    <p class="sub">You are Rama. After fourteen years away, you are coming home to Ayodhya.</p>
+    <ul>
+      <li><span class="key">WASD</span>walk, and look around with the mouse</li>
+      <li><span class="key">E</span>talk to people, pick things up, light lamps</li>
+      <li><span class="key">Esc</span>pause and settings</li>
+    </ul>
+    <div class="row"><button class="go" id="begin">Begin</button></div>
+    <p class="cr">Look inspired by <a href="https://april-zhu.com/colorfigures" target="_blank" rel="noopener">Colorfigures</a> by April Zhu (MIT). Made for Festive Hacks 2026.</p>
+  </div>
+</div>
+<div class="card" id="pause" hidden>
+  <div class="in">
+    <h2>Paused</h2>
+    <ul>
+      <li><span class="key">WASD</span>walk. Move the mouse to look. If the mouse is not captured, drag to look.</li>
+      <li><span class="key">E</span>talk, pick up, light a lamp, fill a petal</li>
+      <li><span class="key">Space</span>or click: go on in a talk</li>
+    </ul>
+    <div class="sets">
+      <div><label for="sWob">Hand-drawn wobble</label><input id="sWob" type="range" min="0" max="7" step="0.1" value="2.4"></div>
+      <div><label for="sGrain">Paper grain</label><input id="sGrain" type="range" min="0" max="1" step="0.05" value="0.8"></div>
+      <div><label for="sSens">Mouse speed</label><input id="sSens" type="range" min="0.3" max="2.5" step="0.05" value="1"></div>
+      <div><label for="sVol">Sound</label><input id="sVol" type="range" min="0" max="1" step="0.05" value="0.7"></div>
+    </div>
+    <div class="row"><button id="restart">Start again</button><button class="go" id="resume">Resume</button></div>
+  </div>
+</div>
+<div class="card" id="why" hidden>
+  <div class="in">
+    <h2>Why we celebrate Diwali</h2>
+    <p class="sub">Deepavali means "a row of lamps".</p>
+    <ul class="why">
+      <li>In the north, Diwali remembers the night Rama came home to Ayodhya. The city lit rows of lamps to light his way.</li>
+      <li>In the south, many celebrate Krishna and Satyabhama's victory over Narakasura, on Naraka Chaturdashi. That is another story, on another island.</li>
+      <li>On Amavasya, the moonless night, families do Lakshmi Puja to welcome Lakshmi, goddess of wealth and well-being.</li>
+      <li>In Bengal, the same night is Kali Puja.</li>
+      <li>Sikhs celebrate Bandi Chhor Divas, when Guru Hargobind was freed from Gwalior Fort and came home to Amritsar.</li>
+      <li>Jains remember the night Mahavira attained nirvana.</li>
+      <li>Diwali runs over five days: Dhanteras, Naraka Chaturdashi, Lakshmi Puja, Govardhan Puja and Bhai Dooj.</li>
+    </ul>
+    <div class="chips"><span class="chip"><b>दीपावली</b>Deepavali, a row of lamps</span><span class="chip"><b>दीया</b>diya, a clay lamp</span>
+      <span class="chip"><b>रंगोली</b>rangoli, patterns in coloured powder</span><span class="chip"><b>लक्ष्मी पूजा</b>Lakshmi Puja</span></div>
+    <p class="next">Tomorrow is Govardhan Puja: Krishna's island is next!</p>
+    <div class="row"><button id="again">Play again</button><button class="go" id="back">Back to the islands</button></div>
+  </div>
+</div>
+<div id="test"></div>
+<div id="fatal"></div>
+<div id="veil"><svg aria-hidden="true"><filter id="vgr"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" stitchTiles="stitch"/>
+  <feColorMatrix values="0 0 0 0 .16  0 0 0 0 .13  0 0 0 0 .09  .42 0 0 0 -.14"/></filter><rect width="100%" height="100%" filter="url(#vgr)"/></svg>
+  <div class="t" id="veilT">Diwali · Rama comes home</div></div>
+
+<script type="module">
+import * as THREE from 'three';
+THREE.ColorManagement.enabled = false;
+
+const $ = id => document.getElementById(id);
+const PI = Math.PI, TAU = PI*2, V3 = THREE.Vector3, V2 = THREE.Vector2;
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v)), lerp = (a, b, t) => a + (b - a)*t;
+const ease = t => t < .5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2)/2, sm = t => t*t*(3 - 2*t);
+const outBack = t => 1 + 2.2*Math.pow(t - 1, 3) + 1.2*Math.pow(t - 1, 2);
+const angDiff = (a, b) => { let d = (b - a) % TAU; if (d > PI) d -= TAU; if (d < -PI) d += TAU; return d; };
+let seedV = 7; const rnd = () => (seedV = (seedV*16807) % 2147483647)/2147483647;
+const ERR = []; addEventListener('error', e => ERR.push(String(e.message))); addEventListener('unhandledrejection', e => ERR.push(String(e.reason)));
+
+/* ---------------- palette: DESIGN.md triples, plus a few new ones (listed in NOTES.md) ---------------- */
+const pal = (l, m, d) => ({ l, m, d });
+const GRASS = pal('#b4d98b', '#93c16c', '#4d7739'), EARTH = pal('#d6b07e', '#b58b58', '#6b4a2a');
+const ROCK = pal('#e7c38f', '#c9a068', '#7c5934');
+const KBLUE = pal('#86a5e3', '#6383c6', '#2e4278'), GOLD = pal('#f7c84a', '#d9a32b', '#6e5015');
+const TOMATO = pal('#ef7157', '#cf5641', '#5a251a'), BLUSH = pal('#f4abc0', '#d98ba2', '#5b2b39');
+const TEAL = pal('#82d0c2', '#5fb2a4', '#204b43'), WHITE = pal('#fbf7ec', '#e3dbca', '#a89d86');
+const INDIGO = pal('#9195e3', '#6e72c6', '#2d306c'), MUSTARD = pal('#f4bf45', '#d59f2a', '#5f4614');
+const SK1 = pal('#e1a87b', '#c48a5e', '#6d4429'), SK2 = pal('#cf9466', '#ae754b', '#5f3b22');
+const HAIR = pal('#4b3a2e', '#32261d', '#1c140e');
+const MUD = pal('#ecc791', '#d0a56d', '#7a5833'), THATCH = pal('#f3d980', '#d7b75b', '#806427');
+const CLOUD = pal('#b8bdc8', '#9097a5', '#5c6272'), BARK = pal('#a77a52', '#865c38', '#43301d');
+const LEAF = pal('#9ad17a', '#73b055', '#2f5a25'), TREE = pal('#8fca6d', '#69a84b', '#2d5424');
+const CLAY = pal('#e48e5d', '#c56a3d', '#5f2c16');
+// new triples for this island
+const SAFFRON = pal('#f9a15e', '#e5803c', '#6b3414'), MARIGOLD = pal('#ffb84a', '#ef9a28', '#74470e');
+const SAND = pal('#f2d6ab', '#dcb683', '#7f5e38'), PLUM = pal('#c18ac8', '#9d68a6', '#45244c');
+const INK = '#2a2118', PAPER = '#f4efe3', SHADOW = '#4f5f9a', DOOR = '#4a3524', NIGHT = '#363a57', DUSK = '#bdb3a6';
+const FLAME = '#ffc83d', CORE = '#fff3c2', POOL = '#f6d27a';
+const flatP = h => pal(h, h, h);
+const hv = h => new V3(parseInt(h.slice(1, 3), 16)/255, parseInt(h.slice(3, 5), 16)/255, parseInt(h.slice(5, 7), 16)/255);
+const mixHex = (a, b, t) => hv(a).lerp(hv(b), t);
+
+/* ---------------- renderer, targets ---------------- */
+const canvas = $('c');
+let renderer;
+try { renderer = new THREE.WebGLRenderer({ canvas, antialias: false }); }
+catch (e) { $('fatal').style.display = 'flex'; $('fatal').textContent = 'This game needs WebGL, which this browser could not start.'; throw e; }
+renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(72, 1, .03, 1200);
+camera.rotation.order = 'YXZ'; camera.layers.enableAll();
+const rtCol = new THREE.WebGLRenderTarget(4, 4);
+const rtId = new THREE.WebGLRenderTarget(4, 4, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+
+/* ---------------- materials: three flat tones, lit from one side (as Govardhan) ----------------
+   New here: instancing support, and a warm "lamp-lit" ambient that spreads along the road as the city lights up. */
+const U = { uLight: { value: new V3(.5, 1, .2).normalize() }, uAmb: { value: new V3(1, 1, 1) },
+  uWarm: { value: new THREE.Vector4(999, 999, 0, 0) }, uWarmC: { value: new V3(.86, .7, .55) } };
+const INST = `mat4 M = modelMatrix;
+#ifdef USE_INSTANCING
+  M = M*instanceMatrix;
+#endif
+`;
+const TOON_V = `varying vec3 vN; varying vec3 vW;
+void main(){ ${INST} vec4 w = M*vec4(position,1.); vW = w.xyz; vN = normalize(mat3(M)*normal); gl_Position = projectionMatrix*viewMatrix*w; }`;
+const TOON_F = `uniform vec3 cL; uniform vec3 cM; uniform vec3 cD; uniform vec3 uLight; uniform vec3 uAmb; uniform float uFlat; uniform float uEmis;
+uniform vec4 uWarm; uniform vec3 uWarmC; varying vec3 vN; varying vec3 vW;
+void main(){
+  vec3 n;
+  if (uFlat > .5) n = normalize(cross(dFdx(vW), dFdy(vW)));
+  else { n = normalize(vN); if (!gl_FrontFacing) n = -n; }
+  float d = dot(n, uLight);
+  vec3 c = mix(cD, cM, smoothstep(-.30, -.26, d));
+  c = mix(c, cL, smoothstep(.43, .47, d));
+  float wz = smoothstep(uWarm.x - 7., uWarm.x + 2., vW.z)*(1. - smoothstep(uWarm.y, uWarm.y + 9., vW.z));
+  float hw = vW.z > 31. ? 3.5 : uWarm.z; float wx = 1. - smoothstep(hw, hw + 7., abs(vW.x));
+  float w = wz*wx*uWarm.w*smoothstep(-7., -2., vW.y);
+  c = mix(c*mix(uAmb, uWarmC, w), c, uEmis);
+  gl_FragColor = vec4(c, 1.);
+}`;
+const matCache = new Map();
+function toon(p, flat = 1, emis = 0, light = null){
+  const k = p.l + p.m + p.d + flat + emis + (light ? 'x' : ''); if (matCache.has(k)) return matCache.get(k);
+  const m = new THREE.ShaderMaterial({ uniforms: { cL: { value: hv(p.l) }, cM: { value: hv(p.m) }, cD: { value: hv(p.d) }, uFlat: { value: flat },
+    uEmis: { value: emis }, uLight: light || U.uLight, uAmb: U.uAmb, uWarm: U.uWarm, uWarmC: U.uWarmC }, vertexShader: TOON_V, fragmentShader: TOON_F, side: THREE.DoubleSide });
+  matCache.set(k, m); return m;
+}
+// ID + depth pass. Instanced meshes get one id per instance; far lamps drop out of it so they are not swallowed by ink.
+let IDPASS = false, PID = 1;
+const idMat = new THREE.ShaderMaterial({ uniforms: { uId: { value: 0 }, uHl: { value: 0 }, uFar: { value: 0 } }, side: THREE.DoubleSide,
+  vertexShader: `uniform float uFar; varying float vZ; varying float vI;
+void main(){ mat4 M = modelViewMatrix; float I = 0.;
+#ifdef USE_INSTANCING
+  M = M*instanceMatrix;
+#if __VERSION__ >= 300
+  I = float(gl_InstanceID);
+#endif
+#endif
+  vec4 mv = M*vec4(position,1.); vZ = -mv.z; vI = I; gl_Position = projectionMatrix*mv;
+  if (uFar > 0.){ vec4 o = M*vec4(0., 0., 0., 1.); if (-o.z > uFar) gl_Position = vec4(0., 0., 2., 1.); } }`,
+  fragmentShader: `uniform float uId; uniform float uHl; varying float vZ; varying float vI;
+void main(){ float id = uId + floor(vI + .5); float g = floor(id/256.); float r = id - g*256.; g += uHl*128.;
+  float dz = clamp(log2(max(vZ, 0.) + 1.)/9., 0., 1.); gl_FragColor = vec4(r/255., g/255., floor(dz*255.)/255., fract(dz*255.)); }` });
+function onBR(){ if (!IDPASS) return; const u = idMat.uniforms; u.uId.value = this.userData.pid; u.uHl.value = this.userData.hl ? 1 : 0; u.uFar.value = this.userData.far || 0; idMat.uniformsNeedUpdate = true; }
+// flat cast shadow, as Govardhan. At night it turns to a dark indigo shade so it never reads as water.
+const shadowMat = new THREE.ShaderMaterial({ uniforms: { uSun: { value: new V3(.42, 1, .3).normalize() }, uCol: { value: hv(SHADOW) } },
+  vertexShader: `uniform vec3 uSun; void main(){ vec4 w = modelMatrix*vec4(position,1.); float h = max(w.y, 0.); w.xz -= uSun.xz/uSun.y*h*.42; w.y = .016; gl_Position = projectionMatrix*viewMatrix*w; }`,
+  fragmentShader: `uniform vec3 uCol; void main(){ gl_FragColor = vec4(uCol, 1.); }`, depthWrite: false, side: THREE.DoubleSide,
+  polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+// flat warm light pool under each lamp: a soft disc in POOL, drawn flat like the shadows (no ink)
+const poolMat = new THREE.ShaderMaterial({ uniforms: { uC: { value: hv(POOL) }, uA: { value: 1 } }, transparent: true, depthWrite: false,
+  polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
+  vertexShader: `varying float vR; void main(){ vR = length(position.xz); ${INST} gl_Position = projectionMatrix*viewMatrix*M*vec4(position,1.); }`,
+  fragmentShader: `uniform vec3 uC; uniform float uA; varying float vR;
+void main(){ float a = mix(.86, .42, smoothstep(.52, .58, vR))*(1. - smoothstep(.9, 1., vR)); gl_FragColor = vec4(uC, a*uA); }` });
+const poolG = new THREE.CircleGeometry(1, 28).rotateX(-PI/2);
+
+/* ---------------- geometry helpers ---------------- */
+const UP = new V3(0, 1, 0), DOWN = new V3(0, -1, 0), _d = new V3(), _q = new THREE.Quaternion(), _v = new V3(), _m = new THREE.Matrix4();
+const GEO = {};
+const sphG = (w = 14, h = 10) => GEO['s' + w + h] || (GEO['s' + w + h] = new THREE.SphereGeometry(1, w, h));
+const ellG = (rx, ry, rz, w = 14, h = 10) => { const g = new THREE.SphereGeometry(1, w, h); g.scale(rx, ry, rz); return g; };
+const rodG = (rt, rb, s = 7) => { const k = 'r' + rt + '_' + rb + '_' + s; return GEO[k] || (GEO[k] = new THREE.CylinderGeometry(rt, rb, 1, s, 1)); };
+const boxG = () => GEO.box || (GEO.box = new THREE.BoxGeometry(1, 1, 1));
+const latheG = (pts, s = 14) => new THREE.LatheGeometry(pts.map(([r, y]) => new V2(Math.max(r, 0), y)), s);
+function mk(geo, p, o = {}){
+  const m = new THREE.Mesh(geo, o.mat || toon(p, o.flat ?? 1, o.emis ?? 0));
+  m.userData.pid = o.id ?? PID++; m.onBeforeRender = onBR; if (o.layer) m.layers.set(o.layer); if (o.noShadow) m.userData.noShadow = true;
+  return m;
+}
+function ball(parent, c, r, p, o = {}){ const m = mk(sphG(o.w || 12, o.h || 9), p, { flat: 0, ...o }); m.position.copy(c); m.scale.setScalar(r); parent.add(m); return m; }
+function setRod(m, a, b){ _d.subVectors(b, a); const L = _d.length() || 1e-4; m.position.addVectors(a, b).multiplyScalar(.5); m.quaternion.setFromUnitVectors(UP, _d.divideScalar(L)); m.scale.set(1, L, 1); }
+function rod(parent, a, b, r0, p, o = {}){ const r1 = o.r1 ?? r0; const m = mk(rodG(+r1.toFixed(4), +r0.toFixed(4), o.s || 7), p, o); setRod(m, a, b); parent.add(m); return m; }
+function box(parent, x0, y0, z0, x1, y1, z1, p, o = {}){ const m = mk(boxG(), p, o); m.scale.set(x1 - x0, y1 - y0, z1 - z0); m.position.set((x0 + x1)/2, (y0 + y1)/2, (z0 + z1)/2); parent.add(m); return m; }
+function castShadow(root){ const list = []; root.traverse(o => { if (o.isMesh && !o.isInstancedMesh && !o.userData.noShadow && o.layers.mask === 1) list.push(o); });
+  for (const o of list){ const s = new THREE.Mesh(o.geometry, shadowMat); s.layers.set(1); s.renderOrder = 2; s.userData.noShadow = true; s.frustumCulled = false; o.add(s); } }
+function sameId(root){ const id = PID++; root.traverse(o => { if (o.isMesh) o.userData.pid = id; }); }
+function setHL(root, on){ root.traverse(o => { if (o.isMesh) o.userData.hl = on; }); }
+function ringsGeo(rings, cap){
+  const pos = [], n = rings[0].length, P = v => pos.push(v.x, v.y, v.z);
+  for (let r = 0; r < rings.length - 1; r++) for (let i = 0; i < n; i++){
+    const a = rings[r][i], b = rings[r][(i + 1)%n], c = rings[r + 1][(i + 1)%n], d = rings[r + 1][i]; P(a); P(b); P(c); P(a); P(c); P(d); }
+  if (cap){ const t = rings[rings.length - 1]; for (let i = 0; i < n; i++){ P(t[i]); P(t[(i + 1)%n]); P(cap); } }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); return g;
+}
+// a tapered tube through points lying in the local YZ plane (the bow)
+function tubeG(pts, radii, seg = 7){ const rings = pts.map((p, i) => { const q = pts[Math.min(i + 1, pts.length - 1)], o = pts[Math.max(i - 1, 0)];
+    const t = new V3().subVectors(q, o).normalize(), a = new V3(1, 0, 0), b = new V3().crossVectors(t, a).normalize();
+    return Array.from({ length: seg }, (_, k) => { const th = k/seg*TAU; return p.clone().addScaledVector(a, Math.cos(th)*radii[i]).addScaledVector(b, Math.sin(th)*radii[i]); }); });
+  return ringsGeo(rings); }
+function instanced(geo, p, list, o = {}){ // list of Matrix4; one id per instance
+  const m = new THREE.InstancedMesh(geo, o.mat || toon(p, o.flat ?? 1, o.emis ?? 0), list.length); list.forEach((x, i) => m.setMatrixAt(i, x));
+  m.userData.pid = PID; PID += list.length; m.onBeforeRender = onBR; m.frustumCulled = false; if (o.layer) m.layers.set(o.layer); world.add(m); return m; }
+const TRS = (x, y, z, sx = 1, sy = sx, sz = sx, ry = 0) => new THREE.Matrix4().compose(new V3(x, y, z), new THREE.Quaternion().setFromAxisAngle(UP, ry), new V3(sx, sy, sz));
+
+/* ---------------- the floating island ---------------- */
+const world = new THREE.Group(); scene.add(world);
+const ISL = { cx: 0, cz: -6, rx: 50, rz: 84 };
+const rimJ = a => 1 + .035*Math.sin(3*a + .6) + .025*Math.sin(5*a + 2.1) + .012*Math.sin(9*a + 1.3);
+const rimPt = (a, k = 1) => { const j = rimJ(a)*k; return new V2(ISL.cx + ISL.rx*j*Math.cos(a), ISL.cz + ISL.rz*j*Math.sin(a)); };
+function islandRho(x, z){ const ex = (x - ISL.cx)/ISL.rx, ez = (z - ISL.cz)/ISL.rz; return Math.hypot(ex, ez)/rimJ(Math.atan2(ez, ex)); }
+const EDGE_S = rimPt(PI/2).y;
+const flatShape = (pts, p, y, o = {}) => { const s = new THREE.Shape(pts.map(([x, z]) => new V2(x, -z))); const g = new THREE.ShapeGeometry(s, 4).rotateX(-PI/2);
+  const m = mk(g, p, { noShadow: true, ...o }); m.position.y = y; world.add(m); return m; };
+const ellPts = (cx, cz, rx, rz, n = 40, j = () => 1) => Array.from({ length: n }, (_, i) => { const a = i/n*TAU, k = j(a); return [cx + rx*k*Math.cos(a), cz + rz*k*Math.sin(a)]; });
+const rectPts = (x0, z0, x1, z1) => [[x0, z0], [x1, z0], [x1, z1], [x0, z1]];
+{
+  const N = 120, top = Array.from({ length: N }, (_, i) => { const p = rimPt(i/N*TAU); return [p.x, p.y]; });
+  flatShape(top, GRASS, 0);
+  const ring = (k, y, n = N, jit = 0) => Array.from({ length: n }, (_, i) => { const p = rimPt(i/n*TAU, k*(1 + (jit ? (rnd() - .5)*jit : 0))); return new V3(p.x, y - (jit ? rnd()*jit*6 : 0), p.y); });
+  world.add(mk(ringsGeo([ring(1, 0), ring(.988, -3.4)]), EARTH, { noShadow: true }));
+  // the upside-down rocky root mass, lit from below like Govardhan's belly so it keeps three tones
+  seedV = 91; const UL = { value: new V3(.7, -.55, .45).normalize() };
+  const R = [[1, -3.2], [.9, -7.5], [.72, -14], [.5, -22], [.3, -31], [.12, -40]].map(([k, y], i) => ring(k, y, 36, i ? .09 : 0));
+  world.add(mk(ringsGeo(R, new V3(ISL.cx + 3, -47, ISL.cz - 4)), ROCK, { mat: toon(ROCK, 1, 0, UL), noShadow: true }));
+  for (let i = 0; i < 44; i++){ const a = rnd()*TAU, lv = 1 + Math.floor(rnd()*3), [k, y] = [[.9, -7.5], [.72, -14], [.5, -22]][lv - 1], p = rimPt(a, k*.96);
+    const L = 2.5 + rnd()*6, b = new V3(p.x + (rnd() - .5), y - L, p.y + (rnd() - .5));
+    rod(world, new V3(p.x, y + .4, p.y), b, .09, BARK, { r1: .03, noShadow: true, mat: toon(BARK, 1, 0, UL) });
+    if (i%2) for (let k2 = 1; k2 < 4; k2++) ball(world, new V3(p.x, y + .4, p.y).lerp(b, k2/4).add(new V3(.12, 0, 0)), .22, LEAF, { noShadow: true, w: 8, h: 6 }); }
+  for (let i = 0; i < 9; i++){ const a = rnd()*TAU, r = 30 + rnd()*40; ball(world, new V3(Math.cos(a)*r*.9, -18 - rnd()*34, ISL.cz + Math.sin(a)*r*1.3), 1.2 + rnd()*2.4, ROCK, { flat: 1, w: 6, h: 4, noShadow: true, mat: toon(ROCK, 1, 0, UL) }); }
+}
+// flat paper clouds below and around the island
+const CLOUDS = new THREE.Group(); world.add(CLOUDS);
+{ seedV = 23; const cm = toon(WHITE, 0);
+  for (let i = 0; i < 26; i++){ const g = new THREE.Group(), a = rnd()*TAU, far = i > 19, r = far ? 260 + rnd()*120 : 80 + rnd()*170;
+    g.position.set(Math.cos(a)*r, far ? -6 - rnd()*14 : -26 - rnd()*44, ISL.cz + Math.sin(a)*r); const n = 4 + Math.floor(rnd()*3), s0 = far ? 9 : 5 + rnd()*5;
+    for (let k = 0; k < n; k++){ const m = new THREE.Mesh(sphG(14, 10), cm); m.onBeforeRender = onBR; const s = s0*(.7 + rnd()*.6); m.scale.set(s*1.3, s*.32, s);
+      m.position.set((k - n/2)*s0*1.25 + rnd()*2, rnd()*s0*.2, (rnd() - .5)*s0); g.add(m); }
+    g.rotation.y = rnd()*TAU; sameId(g); CLOUDS.add(g); } }
+// stars: tiny flat points on the moonless sky (no ink)
+const starMat = new THREE.ShaderMaterial({ uniforms: { uA: { value: 0 } }, transparent: true, depthWrite: false,
+  vertexShader: `void main(){ ${INST} gl_Position = projectionMatrix*viewMatrix*M*vec4(position,1.); }`,
+  fragmentShader: `uniform float uA; void main(){ gl_FragColor = vec4(.96, .92, .8, uA); }` });
+const stars = new THREE.InstancedMesh(new THREE.OctahedronGeometry(1, 0), starMat, 260); stars.layers.set(1); stars.frustumCulled = false; scene.add(stars);
+{ seedV = 5; for (let i = 0; i < 260; i++){ const a = rnd()*TAU, e = .08 + Math.pow(rnd(), .8)*1.35, r = 700; stars.setMatrixAt(i, TRS(Math.cos(a)*Math.cos(e)*r, Math.sin(e)*r, Math.sin(a)*Math.cos(e)*r, .9 + rnd()*1.8)); } }
+
+/* ---------------- lamps: instanced, so the whole city can light up ---------------- */
+const LAMPS = [], ROWS = [], QUEUE = [];
+let litCount = 0;
+function addLamp(x, y, z, o = {}){ const L = { i: LAMPS.length, x, y, z, k: o.k || 1, pr: o.pr ?? .9, py: o.py ?? y, lit: false, t: 0 }; LAMPS.push(L); return L; }
+function lampLine(x0, z0, x1, z1, n, y, o = {}){ return Array.from({ length: n }, (_, i) => { const t = n > 1 ? i/(n - 1) : .5; return addLamp(lerp(x0, x1, t), y, lerp(z0, z1, t), o); }); }
+function addRow(lamps, trig, o = {}){ const r = { lamps, trig, ahead: o.ahead ?? 24, delay: o.delay || 0, gap: o.gap || .06, note: o.note ?? ROWS.length%5, done: false,
+  who: o.who || null, manual: !!o.manual }; ROWS.push(r); return r; }
+
+/* ---------------- props ---------------- */
+function tree(k = 1){ const g = new THREE.Group();
+  rod(g, new V3(0, 0, 0), new V3(0, 1.9*k, 0), .2*k, BARK, { r1: .15*k });
+  ball(g, new V3(0, 2.9*k, 0), 1.45*k, TREE); ball(g, new V3(.7*k, 3.6*k, -.35*k), .95*k, TREE); return g; }
+function hut(x, z, face){ const g = new THREE.Group();
+  g.add(mk(latheG([[0, 0], [2.1, 0], [2.1, 1.95], [0, 1.95]], 16), MUD));
+  g.add(mk(latheG([[0, 1.78], [2.95, 1.78], [.12, 4.35], [0, 4.35]], 16), THATCH));
+  for (let i = 0; i < 12; i++){ const a = i/12*TAU; rod(g, new V3(2.98*Math.cos(a), 1.79, 2.98*Math.sin(a)), new V3(.5*Math.cos(a), 4.05, .5*Math.sin(a)), .025, flatP(INK), { noShadow: true }); }
+  const door = mk(new THREE.BoxGeometry(.95, 1.45, .14), flatP(DOOR), { noShadow: true });
+  door.position.set(2.08*Math.cos(face), .73, 2.08*Math.sin(face)); door.rotation.y = -face + PI/2; g.add(door);
+  g.position.set(x, 0, z); world.add(g); castShadow(g); return g; }
+const FLAMES = [];
+function diya(parent, x, y, z, k = 1){ const g = new THREE.Group(); g.position.set(x, y, z); g.scale.setScalar(k);
+  g.add(mk(latheG([[0, 0], [.07, 0], [.15, .07], [.13, .1], [0, .08]], 10), CLAY, { noShadow: true }));
+  const fl = mk(latheG([[0, 0], [.05, .03], [.04, .1], [0, .2]], 8), flatP(FLAME), { emis: 1, noShadow: true }); fl.position.set(.05, .08, 0); g.add(fl);
+  const fi = mk(latheG([[0, 0], [.022, .02], [0, .1]], 6), flatP(CORE), { emis: 1, noShadow: true }); fi.position.set(.05, .09, .02); g.add(fi);
+  g.userData.flame = [fl, fi]; FLAMES.push(g); parent.add(g); return g; }
+function thali(parent, x, y, z, lamp = true){ const g = new THREE.Group(); g.position.set(x, y, z);
+  g.add(mk(latheG([[0, 0], [.2, 0], [.22, .03], [0, .02]], 16), GOLD, { noShadow: true }));
+  if (lamp) diya(g, -.04, .02, 0, .8); ball(g, new V3(.1, .04, .06), .035, MARIGOLD, { noShadow: true }); ball(g, new V3(.08, .04, -.08), .03, TOMATO, { noShadow: true });
+  parent.add(g); return g; }
+
+/* ---------------- people (figurines from the Govardhan mockup, plus crowns, jata, tails) ---------------- */
+function person(d){
+  const g = new THREE.Group(), s = d.scale || 1, wide = !!d.sari; g.scale.setScalar(s);
+  for (const x of [.11, -.11]) ball(g, new V3(x, .07, .1), .085, d.skin);
+  g.add(mk(latheG([[0, .03], [wide ? .36 : .27, .03], [.21, .71], [0, .71]], 14), d.low));
+  if (d.border){ const b = mk(new THREE.TorusGeometry(wide ? .35 : .265, .024, 5, 20).rotateX(PI/2), d.border, { flat: 0 }); b.position.y = .08; g.add(b); }
+  g.add(mk(latheG([[0, .71], [.21, .71], [.255, 1.16], [0, 1.16]], 14), d.top));
+  if (d.sash) { const m = mk(new THREE.TorusGeometry(.25, .035, 5, 18), d.sash, { flat: 0 }); m.position.set(0, .95, 0); m.rotation.set(PI/2 - .55, 0, .2); g.add(m); }
+  const head = ball(g, new V3(0, 1.4, 0), .225, d.skin);
+  ball(g, new V3(0, 1.45, -.045), .232, d.veil || HAIR);
+  if (d.veil) g.add(at(mk(latheG([[0, 1.5], [.24, 1.42], [.3, 1.05], [0, 1.02]], 12), d.veil), 0, 0, -.06));
+  if (d.bun) ball(g, new V3(0, 1.43, -.25), .11, HAIR);
+  if (d.braid) for (let i = 0; i < 4; i++) ball(g, new V3(0, 1.28 - i*.13, -.24 - i*.02), .065 - i*.006, HAIR);
+  if (d.jata){ ball(g, new V3(0, 1.69, -.02), .12, HAIR); g.add(at(mk(new THREE.TorusGeometry(.1, .02, 5, 14).rotateX(PI/2), d.jata, { flat: 0 }), 0, 1.66, -.02)); }
+  if (d.crown) g.add(mk(latheG([[0, 1.56], [.2, 1.56], [.22, 1.66], [.16, 1.82], [.07, 1.94], [.025, 2.02], [0, 2.05]], 10), GOLD));
+  if (d.beard) ball(g, new V3(0, 1.3, .13), .13, WHITE);
+  if (d.hat) g.add(mk(latheG([[0, 1.53], [.24, 1.53], [.21, 1.7], [0, 1.7]], 12), d.hat));
+  if (d.muzzle) ball(g, new V3(0, 1.33, .17), .12, d.muzzle);
+  if (d.tail){ const P = [[0, .78, -.2], [0, .6, -.48], [0, .78, -.76], [0, 1.25, -.86], [0, 1.68, -.66], [0, 1.86, -.4]].map(a => new V3(...a));
+    for (let i = 0; i < P.length - 1; i++) rod(g, P[i], P[i + 1], .05 - i*.004, d.skin, { r1: .046 - i*.004 }); ball(g, P[P.length - 1], .055, d.skin); }
+  if (d.gada){ rod(g, new V3(.4, .62, .16), new V3(.3, 1.55, -.18), .03, GOLD); ball(g, new V3(.3, 1.62, -.2), .16, GOLD, { flat: 1, w: 8, h: 6 }); }
+  if (d.bow){ const P = [-1, -.6, 0, .6, 1].map(u => new V3(.05, .95 + u*.62, -.26 - .14*(1 - u*u))); for (let i = 0; i < 4; i++) rod(g, P[i], P[i + 1], .025, BARK);
+    rod(g, P[0], P[4], .006, flatP(INK), { noShadow: true }); }
+  if (d.staff) rod(g, new V3(.42, 0, .16), new V3(.44, 1.82, .16), .035, BARK);
+  let tl = null; if (d.thali) tl = thali(g, 0, .98, .36);
+  const arms = {};
+  for (const side of [1, -1]){ const pv = new THREE.Group(); pv.position.set(side*.29, 1.12, 0); g.add(pv);
+    rod(pv, new V3(0, 0, 0), new V3(0, -.43, 0), .075, d.skin); ball(pv, new V3(0, -.47, 0), .085, d.skin);
+    pv.quaternion.setFromUnitVectors(DOWN, new V3(side*.18, -1, .05).normalize()); arms[side] = pv; }
+  castShadow(g); world.add(g);
+  return { g, arms, head, top: (d.crown ? 2.05 : 1.78)*s, s, thali: tl };
+}
+function at(m, x, y, z){ m.position.set(x, y, z); return m; }
+
+/* ---------------- layout ---------------- */
+const DECK_Y = .55, VIM_END = new V3(0, 0, EDGE_S + 4.4), ZN = EDGE_S - 17, GATE_Z = 30, CHZ = 2.5, STEP_Z = -40.6, MOTHER_Z = -39.4, BACK_Z = -72, SIDE_X = 25;
+const BOXES = [], CIRCS = [];
+// ground: the road, the city floor and the chowk
+flatShape(rectPts(-SIDE_X, BACK_Z, SIDE_X, GATE_Z), MUD, .004);
+flatShape(rectPts(-2.6, STEP_Z, 2.6, EDGE_S - 1.5), EARTH, .008);
+flatShape(rectPts(-2.6, STEP_Z, 2.6, GATE_Z), SAND, .011);
+flatShape(rectPts(-10.6, CHZ - 6.5, 10.6, CHZ + 6.5), SAND, .009);
+flatShape(rectPts(-14, STEP_Z - 6, 14, STEP_Z + 6.5), SAND, .01);
+// fields outside the walls
+for (const [x0, z0, x1, z1] of [[8, 36, 21, 49], [-21, 38, -8, 51]]){ flatShape(rectPts(x0, z0, x1, z1), LEAF, .008);
+  for (let z = z0 + 1.2; z < z1; z += 1.3) rod(world, new V3(x0 + .4, .02, z), new V3(x1 - .4, .02, z), .03, flatP(INK), { noShadow: true, layer: 1 }); }
+// trees outside the city
+{ seedV = 3; let n = 0;
+  for (let k = 0; k < 400 && n < 46; k++){ const a = rnd()*TAU, rr = Math.sqrt(rnd())*.93, x = ISL.cx + Math.cos(a)*rr*ISL.rx, z = ISL.cz + Math.sin(a)*rr*ISL.rz;
+    if (islandRho(x, z) > .9) continue; if (Math.abs(x) < SIDE_X + 3 && z < GATE_Z + 3) continue; if (Math.abs(x) < 6 && z > GATE_Z) continue;
+    if (Math.hypot(x + 4, z - ZN) < 10) continue; if (Math.abs(x) > 7 && Math.abs(x) < 22.5 && z > 34 && z < 53) continue; if (z > EDGE_S - 8 && Math.abs(x) < 9) continue;
+    const t = tree(.9 + rnd()*.7); t.position.set(x, 0, z); world.add(t); castShadow(t); CIRCS.push([x, z, .5]); n++; }
+  for (const [x, z, k] of [[-7, 46, 1.1], [7.5, 52, 1], [-6.5, 36, .95], [6.8, 40, 1.05], [-11, ZN + 6, 1.2], [9, ZN + 3, 1]]){ const t = tree(k); t.position.set(x, 0, z); world.add(t); castShadow(t); CIRCS.push([x, z, .5]); } }
+// grass ticks outside the city
+{ const pos = []; seedV = 11; let n = 0;
+  while (n < 1500){ const a = rnd()*TAU, rr = Math.sqrt(rnd())*.97, x = ISL.cx + rr*ISL.rx*Math.cos(a), z = ISL.cz + rr*ISL.rz*Math.sin(a);
+    if (islandRho(x, z) > .97 || (Math.abs(x) < SIDE_X + 1 && z < GATE_Z + 1) || Math.abs(x) < 3.2) continue; n++;
+    const s = .14 + rnd()*.08, h = rnd()*TAU, cx = Math.cos(h)*s, cz = Math.sin(h)*s;
+    for (const o of [-.6, .5]) pos.push(x + cx*o - .02, 0, z + cz*o, x + cx*o + .03, 0, z + cz*o, x + cx*(o + .35), s*1.5, z + cz*(o + .35)); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+  world.add(mk(g, flatP(INK), { layer: 1, noShadow: true })); }
+// road lamps outside the walls
+for (let z = ZN - 5, k = 0; z > GATE_Z + 2.5; k++){ const ls = []; for (let j = 0; j < 3 && z > GATE_Z + 2.5; j++, z -= 2.4){ ls.push(addLamp(-3, 0, z, { k: 1.1, pr: .95 }), addLamp(3, 0, z, { k: 1.1, pr: .95 })); }
+  addRow(ls, ls[0].z, { ahead: 20, gap: .07 }); }
+
+/* ---------------- Nandigram: Bharata, the padukas on their little throne ---------------- */
+const nandi = new THREE.Group(); world.add(nandi);
+hut(-9, ZN - 1.5, 0); CIRCS.push([-9, ZN - 1.5, 2.6]);
+const THRONE = new V3(-2.9, 0, ZN - .4);
+{ const g = new THREE.Group(); g.position.copy(THRONE); nandi.add(g);
+  box(g, -.75, 0, -.55, .75, .3, .55, SAND); box(g, -.45, .3, -.35, .45, .62, .35, GOLD); box(g, -.45, .62, -.42, .45, 1.35, -.3, GOLD);
+  g.add(at(mk(latheG([[0, 0], [.42, 0], [.3, .18], [0, .26]], 12), GOLD), 0, 1.35, -.36));
+  for (const x of [-.47, .47]) box(g, x - .06, .62, -.35, x + .06, .85, .3, GOLD);
+  rod(g, new V3(.62, 0, -.45), new V3(.62, 2.45, -.45), .03, BARK);
+  g.add(at(mk(latheG([[0, 0], [.95, -.18], [.85, -.1], [0, .28]], 14), TOMATO), .62, 2.45, -.2));
+  castShadow(g); CIRCS.push([THRONE.x, THRONE.z, 1.1]); }
+// the padukas: wooden sandals with a toe knob
+const padG = new THREE.Group(); world.add(padG);
+for (const x of [-.09, .09]){ box(padG, x - .05, 0, -.13, x + .05, .025, .13, BARK); rod(padG, new V3(x, .025, -.07), new V3(x, .075, -.07), .009, GOLD); ball(padG, new V3(x, .08, -.07), .015, GOLD); }
+castShadow(padG); const PAD_HOME = new V3(THRONE.x, .63, THRONE.z + .02); padG.position.copy(PAD_HOME);
+const nandiLamps = Array.from({ length: 10 }, (_, i) => { const a = i/10*TAU; return addLamp(THRONE.x + 2*Math.cos(a), 0, THRONE.z + 1.6*Math.sin(a), { pr: .8 }); });
+addRow(nandiLamps, ZN, { manual: true, gap: .08 });
+
+/* ---------------- Ayodhya: walls, the gate, houses, the chowk, the palace ---------------- */
+const MERLONS = [];
+function wall(x0, z0, x1, z1, lampsTo, trig, o = {}){ // straight wall with merlons and lamps between them
+  const h = 4.2, t = .6, dx = x1 - x0, dz = z1 - z0, L = Math.hypot(dx, dz), ux = dx/L, uz = dz/L;
+  const m = box(world, -L/2, 0, -t, L/2, h, t, SAND); m.position.set((x0 + x1)/2, h/2, (z0 + z1)/2); m.rotation.y = -Math.atan2(dz, dx); castShadow(m);
+  BOXES.push([Math.min(x0, x1) - (uz ? t : 0), Math.min(z0, z1) - (ux ? t : 0), Math.max(x0, x1) + (uz ? t : 0), Math.max(z0, z1) + (ux ? t : 0)]);
+  const n = Math.floor(L/2); for (let i = 0; i <= n; i++){ const s = i/n*L; MERLONS.push(TRS(x0 + ux*s, h + .3, z0 + uz*s, .7, .6, .7, -Math.atan2(dz, dx))); }
+  const ls = []; for (let i = 0; i < n; i++){ const s = (i + .5)/n*L; ls.push(addLamp(x0 + ux*s, h, z0 + uz*s, { pr: .5 })); }
+  if (lampsTo) lampsTo.push(...ls); return ls; }
+function tower(x, z, r, h, k = 1){ const g = new THREE.Group(); g.position.set(x, 0, z); world.add(g);
+  g.add(mk(new THREE.CylinderGeometry(r, r*1.06, h, 8).translate(0, h/2, 0), SAND)); g.add(at(mk(new THREE.CylinderGeometry(r*1.12, r*1.12, .3, 8), ROCK), 0, h + .15, 0));
+  for (let i = 0; i < 4; i++){ const a = i/4*TAU + PI/4; rod(g, new V3(Math.cos(a)*r*.6, h + .3, Math.sin(a)*r*.6), new V3(Math.cos(a)*r*.6, h + 1.9*k, Math.sin(a)*r*.6), .09*k, WHITE); }
+  g.add(at(mk(latheG([[0, 0], [r*.8, 0], [r*.75, .5*k], [r*.45, 1*k], [.08, 1.45*k], [0, 1.6*k]], 12), GOLD), 0, h + 1.9*k, 0));
+  castShadow(g); CIRCS.push([x, z, r + .2]);
+  return Array.from({ length: 8 }, (_, i) => { const a = (i + .5)/8*TAU; return addLamp(x + Math.cos(a)*r*.86, h + .3, z + Math.sin(a)*r*.86, { pr: .3 }); }); }
+// front wall, the gate and the corners
+const gateL = wall(-SIDE_X, GATE_Z, -6.6, GATE_Z), gateR = wall(6.6, GATE_Z, SIDE_X, GATE_Z);
+addRow(gateL.reverse(), GATE_Z, { ahead: 15 }); addRow(gateR, GATE_Z, { ahead: 15 });
+const tw = [tower(-4.6, GATE_Z, 2, 7.2), tower(4.6, GATE_Z, 2, 7.2)];
+{ box(world, -2.9, 5.2, GATE_Z - .9, 2.9, 6.5, GATE_Z + .9, SAND); box(world, -3.1, 6.5, GATE_Z - 1, 3.1, 6.75, GATE_Z + 1, ROCK);
+  for (let i = 0; i <= 18; i++){ const t = i/18, x = lerp(-2.6, 2.6, t), y = 5.05 - Math.sin(t*PI)*.55; ball(world, new V3(x, y, GATE_Z + .95), .1, i%2 ? MARIGOLD : TOMATO, { noShadow: true }); }
+  castShadow(world.children[world.children.length - 21]);
+  addRow([...tw[0], ...lampLine(-2.5, GATE_Z + .4, 2.5, GATE_Z + .4, 8, 6.75, { pr: .4 }), ...tw[1]], GATE_Z, { ahead: 22, delay: .3 }); }
+const sideL = [], sideR = [];
+wall(-SIDE_X, GATE_Z, -SIDE_X, BACK_Z, sideL); wall(SIDE_X, GATE_Z, SIDE_X, BACK_Z, sideR);
+for (const side of [sideL, sideR]){ side.sort((a, b) => b.z - a.z); for (let i = 0; i < side.length; i += 6) addRow(side.slice(i, i + 6), side[i].z, { ahead: 34, gap: .07 }); }
+const backL = wall(-SIDE_X, BACK_Z, 0, BACK_Z), backR = wall(0, BACK_Z, SIDE_X, BACK_Z);
+for (const [x, z] of [[-SIDE_X, GATE_Z], [SIDE_X, GATE_Z], [-SIDE_X, BACK_Z], [SIDE_X, BACK_Z]]) addRow(tower(x, z, 1.8, 5.8, .8), z, { ahead: z > 0 ? 18 : 40, delay: .5 });
+addRow(backL.reverse().concat(backR), BACK_Z, { ahead: 42, delay: .4 });
+instanced(boxG(), SAND, MERLONS);
+
+// houses
+const TORAN_M = [], TORAN_L = [], RESIDENTS = [];
+const HOUSEP = [MUD, WHITE, SAND, MUD, ROCK, WHITE];
+function laneHouse(side, zc, w, storeys, pi, who){
+  const g = new THREE.Group(); world.add(g); const P = HOUSEP[pi%HOUSEP.length], h = storeys > 1 ? 6.4 : 3.7, x0 = 7, x1 = 12, z0 = zc - w/2, z1 = zc + w/2, S = side;
+  const X = (a, b) => S > 0 ? [a, b] : [-b, -a];
+  { const [a, b] = X(x0, x1); box(g, a, 0, z0, b, h, z1, P); const [c, e] = X(x0 - .25, x1 + .25); box(g, c, h, z0 - .25, e, h + .2, z1 + .25, ROCK); const [f, k] = X(x0 - .1, x1 + .1); box(g, f, h + .2, z0 - .1, k, h + .6, z1 + .1, P); }
+  { const [a, b] = X(5.5, x0); box(g, a, 0, z0 + .2, b, .45, z1 - .2, EARTH); }
+  const fx = S*(x0 - .03); box(g, fx - .06, .45, zc - .55, fx + .06, 2.5, zc + .55, flatP(DOOR), { noShadow: true }); box(g, fx - .09, 2.5, zc - .75, fx + .09, 2.72, zc + .75, TOMATO, { noShadow: true });
+  for (let i = 0; i < 9; i++){ const z = zc - .7 + i*.175, y = 2.42 - Math.sin(i/8*PI)*.18; (i%2 ? TORAN_L : TORAN_M).push(TRS(S*(x0 - .14), y - (i%2 ? .06 : 0), z, i%2 ? 1 : .085, i%2 ? 1 : .085, i%2 ? 1 : .085)); }
+  const win = (y, z) => { box(g, fx - .05, y, z - .38, fx + .05, y + .9, z + .38, flatP(DOOR), { noShadow: true }); box(g, fx - .2, y - .08, z - .48, fx + .2, y, z + .48, SAND, { noShadow: true }); };
+  if (storeys > 1){ win(3.9, zc - 1.3); win(3.9, zc + 1.3); const [a, b] = X(6.3, x0); box(g, a, 3.25, z0 + .3, b, 3.42, z1 - .3, ROCK); }
+  else win(1.2, zc + (w > 5 ? 1.7 : 1.5));
+  castShadow(g); BOXES.push(S > 0 ? [5.4, z0, x1 + .3, z1] : [-x1 - .3, z0, -5.4, z1]);
+  const ground = lampLine(S*5.95, z1 - .5, S*5.95, z0 + .5, 4, .45, { pr: .42 });
+  const roof = lampLine(S*7.45, z1 - .4, S*7.45, z0 + .4, 6, h + .6, { pr: .34 });
+  const rr = addRow(ground, zc, { ahead: 22, who });
+  addRow(roof, zc, { ahead: 22, delay: .45, note: rr.note + 2 });
+  if (storeys > 1) addRow(lampLine(S*6.6, z1 - .5, S*6.6, z0 + .5, 5, 3.42, { pr: .26 }), zc, { ahead: 22, delay: .25 });
+  return g; }
+function backHouse(side, zc, w, h, pi){ const g = new THREE.Group(); world.add(g); const P = HOUSEP[(pi + 2)%HOUSEP.length], S = side, X = (a, b) => S > 0 ? [a, b] : [-b, -a];
+  { const [a, b] = X(14.5, 21); box(g, a, 0, zc - w/2, b, h, zc + w/2, P); const [c, e] = X(14.3, 21.2); box(g, c, h, zc - w/2 - .2, e, h + .5, zc + w/2 + .2, ROCK); }
+  { const [a, b] = X(14.45, 14.55); for (const y of [1.2, 3.9, 6.6]) if (y + 1 < h) for (const dz of [-1.2, 1.2]) box(g, a - .02, y, zc + dz - .35, b + .02, y + .85, zc + dz + .35, flatP(DOOR), { noShadow: true }); }
+  if (pi%3 === 0){ const cx = S*17.7; for (const [dx, dz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) rod(g, new V3(cx + dx, h + .5, zc + dz), new V3(cx + dx, h + 2.1, zc + dz), .08, WHITE);
+    g.add(at(mk(latheG([[0, 0], [1.45, 0], [1.3, .5], [.7, 1.05], [.08, 1.4], [0, 1.55]], 12), WHITE), cx, h + 2.1, zc)); }
+  castShadow(g); BOXES.push(S > 0 ? [14.3, zc - w/2, 21.2, zc + w/2] : [-21.2, zc - w/2, -14.3, zc + w/2]);
+  addRow(lampLine(S*14.75, zc + w/2 - .4, S*14.75, zc - w/2 + .4, 6, h + .5, { pr: .34 }), zc, { ahead: 30, delay: .7 }); }
+
+const LANE_Z = [24.6, 18.6, 12.6, -7.2, -13.2, -19.2, -25.2, -31.2];
+const LANE_LINES = ['Welcome home, Rama!', 'Siyavar Ramchandra ki jai!', 'Fourteen years! Light every lamp!', 'Sita Maa is home too!', 'Lakshmana, welcome back!',
+  'Look, Hanuman is with them!', 'No house stays dark tonight.', 'Bring more oil! More lamps!', 'Rama is home! Rama is home!', 'We kept a lamp in the window for you.',
+  'Light the roof too, quickly!', 'Welcome home, Raja Rama!', 'The road is lit all the way to the palace.', 'Amma, look! Every roof has a lamp.', 'Siyavar Ramchandra ki jai!', 'Welcome home!'];
+const ROLES = ['Potter', 'Weaver', 'Flower seller', 'Grandmother', 'Child', 'Musician', 'Cowherd', 'Sweet maker', 'Carpenter', 'Mother', 'Grandfather', 'Gardener', 'Boy', 'Girl', 'Tailor', 'Oil seller'];
+const CLOTH = [[TOMATO, MUSTARD], [TEAL, WHITE], [INDIGO, MARIGOLD], [BLUSH, TEAL], [WHITE, SAFFRON], [MARIGOLD, TOMATO], [PLUM, GOLD], [SAFFRON, WHITE]];
+const VILL = [];
+LANE_Z.forEach((zc, i) => { for (const side of [-1, 1]){ const k = VILL.length, woman = k%2 === 0, kid = k%5 === 4, [lo, tp] = CLOTH[k%CLOTH.length];
+  const d = { id: 'v' + k, name: ROLES[k%ROLES.length], skin: k%3 ? SK1 : SK2, low: lo, top: tp, sari: woman && !kid, veil: woman && k%4 === 0 ? lo : null, bun: woman, hat: !woman && !kid ? tp : null,
+    scale: kid ? .72 : 1, thali: true, line: LANE_LINES[k%LANE_LINES.length], side, door: new V2(side*8.2, zc), out: new V2(side*6.35, zc + (k%3 - 1)*.6), y: .45 };
+  VILL.push(d); laneHouse(side, zc, i === 2 || i === 7 ? 5 : 5.4, (i + (side > 0 ? 1 : 0))%3 === 0 ? 1 : 2, k, d); } });
+for (const side of [-1, 1]) for (let i = 0; i < 9; i++){ const zc = 25.5 - i*7; if (side > 0 && Math.abs(zc - CHZ) < 7.5) continue; backHouse(side, zc, 6, 6.4 + ((i*7 + (side > 0 ? 3 : 0))%5)*.7, i + (side > 0 ? 1 : 0)); }
+// road lamps in the city, row by row ahead of you
+for (let z = GATE_Z - 2, k = 0; z > STEP_Z + 1.5; k++){ const ls = []; for (let j = 0; j < 3 && z > STEP_Z + 1.5; j++, z -= 2.2) ls.push(addLamp(-3, 0, z, { k: 1.1, pr: .95 }), addLamp(3, 0, z, { k: 1.1, pr: .95 }));
+  addRow(ls, ls[0].z, { ahead: 21 }); }
+// the chowk: the peepal tree on the west, the family's house on the east (used again in today's scene)
+const PEEPAL = new V2(-9.4, CHZ);
+{ const g = new THREE.Group(); g.position.set(PEEPAL.x, 0, PEEPAL.y); world.add(g);
+  g.add(mk(new THREE.CylinderGeometry(2.6, 2.7, .5, 16).translate(0, .25, 0), ROCK)); const t = tree(1.7); g.add(t); ball(g, new V3(-1.2, 4.8, .8), 1.4, TREE);
+  castShadow(g); CIRCS.push([PEEPAL.x, PEEPAL.y, 2.7]);
+  addRow(Array.from({ length: 14 }, (_, i) => { const a = i/14*TAU + PI; return addLamp(PEEPAL.x + 2.35*Math.cos(a), .5, PEEPAL.y + 2.35*Math.sin(a), { pr: .3 }); }), CHZ, { ahead: 22, delay: .2 }); }
+const FAM = { x0: 12.5, x1: 18.5, z0: CHZ - 4, z1: CHZ + 4, h: 6.4 };
+{ const g = new THREE.Group(); world.add(g);
+  box(g, FAM.x0, 0, FAM.z0, FAM.x1, FAM.h, FAM.z1, WHITE); box(g, FAM.x0 - .25, FAM.h, FAM.z0 - .25, FAM.x1 + .25, FAM.h + .2, FAM.z1 + .25, ROCK); box(g, FAM.x0 - .1, FAM.h + .2, FAM.z0 - .1, FAM.x1 + .1, FAM.h + .6, FAM.z1 + .1, WHITE);
+  box(g, 10.8, 0, FAM.z0 + .4, FAM.x0, .45, FAM.z1 - .4, EARTH);
+  box(g, FAM.x0 - .09, .45, CHZ - .6, FAM.x0 + .03, 2.6, CHZ + .6, flatP(DOOR), { noShadow: true }); box(g, FAM.x0 - .12, 2.6, CHZ - .8, FAM.x0 + .05, 2.82, CHZ + .8, TOMATO, { noShadow: true });
+  for (let i = 0; i < 9; i++){ const z = CHZ - .75 + i*.19, y = 2.52 - Math.sin(i/8*PI)*.2; (i%2 ? TORAN_L : TORAN_M).push(TRS(FAM.x0 - .16, y - (i%2 ? .06 : 0), z, i%2 ? 1 : .085)); }
+  for (const dz of [-2.4, 2.4]){ box(g, FAM.x0 - .06, 3.9, CHZ + dz - .4, FAM.x0 + .02, 4.85, CHZ + dz + .4, flatP(DOOR), { noShadow: true }); box(g, FAM.x0 - .22, 3.82, CHZ + dz - .5, FAM.x0 + .02, 3.9, CHZ + dz + .5, SAND, { noShadow: true }); }
+  castShadow(g); BOXES.push([10.7, FAM.z0, FAM.x1, FAM.z1]);
+  addRow(lampLine(11.25, FAM.z1 - .7, 11.25, FAM.z0 + .7, 6, .45, { pr: .38 }), CHZ, { ahead: 22, delay: .1 });
+  addRow(lampLine(12.95, FAM.z1 - .4, 12.95, FAM.z0 + .4, 8, FAM.h + .6, { pr: .34 }), CHZ, { ahead: 22, delay: .5 }); }
+{ seedV = 61; const leafG = ellG(.03, .085, .05, 8, 6); instanced(leafG, LEAF, TORAN_L, { flat: 0 }); instanced(sphG(8, 6), MARIGOLD, TORAN_M, { flat: 0 }); }
+
+// the palace
+const PAL = { steps: STEP_Z, top: STEP_Z - 5.5, ter: -53, back: -66 };
+{ const g = new THREE.Group(); world.add(g);
+  for (let k = 1; k <= 5; k++) box(g, -6.4, 0, PAL.top, 6.4, k*.25, STEP_Z - (k - 1)*1.1, SAND);
+  box(g, -15, 0, PAL.ter, 15, 1.25, PAL.top, ROCK); box(g, -15.2, 1.15, PAL.ter - .2, 15.2, 1.3, PAL.top + .1, SAND, { noShadow: true });
+  box(g, -12.5, 1.25, PAL.back, 12.5, 8.25, PAL.ter, SAND); box(g, -12.8, 8.25, PAL.back - .3, 12.8, 8.55, PAL.ter + .3, ROCK); box(g, -12.6, 8.55, PAL.back - .1, 12.6, 9.05, PAL.ter + .1, SAND);
+  for (let i = 0; i < 8; i++){ const x = -10.5 + i*3; rod(g, new V3(x, 1.25, PAL.ter + 1.6), new V3(x, 6.6, PAL.ter + 1.6), .26, WHITE, { s: 10 }); }
+  box(g, -12.5, 6.6, PAL.ter, 12.5, 7.05, PAL.ter + 2.3, ROCK);
+  box(g, -1.3, 1.25, PAL.ter + .02, 1.3, 4.9, PAL.ter + .14, flatP(DOOR), { noShadow: true });
+  for (const x of [-7, -3.8, 3.8, 7]) box(g, x - .55, 2.2, PAL.ter + .02, x + .55, 4.6, PAL.ter + .1, flatP(DOOR), { noShadow: true });
+  const dome = (x, z, r, P) => { g.add(at(mk(latheG([[0, 0], [r, 0], [r*1.08, r*.45], [r*.85, r*.95], [r*.35, r*1.35], [.06, r*1.6], [0, r*1.7]], 16), P), x, 9.05, z));
+    g.add(at(mk(new THREE.CylinderGeometry(r*1.06, r*1.06, .35, 16), ROCK), x, 9.05, z)); ball(g, new V3(x, 9.05 + r*1.75, z), .18, GOLD); };
+  dome(0, -59.5, 3.4, GOLD); dome(-8, -59.5, 2, WHITE); dome(8, -59.5, 2, WHITE);
+  rod(g, new V3(0, 15, -59.5), new V3(0, 17.4, -59.5), .05, BARK);
+  { const s = new THREE.Shape([new V2(0, 0), new V2(1.4, -.35), new V2(0, -.75)]); g.add(at(mk(new THREE.ShapeGeometry(s), SAFFRON, { noShadow: true }), 0, 17.4, -59.5)); }
+  castShadow(g);
+  BOXES.push([-15.3, PAL.ter - 30, 15.3, PAL.ter], [6.4, PAL.top - .3, 15.3, PAL.top + .3], [-15.3, PAL.top - .3, -6.4, PAL.top + .3], [-15.6, PAL.ter, -15, PAL.top], [15, PAL.ter, 15.6, PAL.top]);
+  const T = STEP_Z; let d = 0;
+  for (let k = 1; k <= 5; k++, d += .32) addRow(lampLine(-5.8, T - (k - 1)*1.1 - .3, 5.8, T - (k - 1)*1.1 - .3, 11, k*.25, { pr: .3 }), T, { ahead: 28, delay: d, gap: .05 });
+  addRow([...lampLine(-6.9, PAL.top - .35, -14.6, PAL.top - .35, 7, 1.3, { pr: .32 }), ...lampLine(6.9, PAL.top - .35, 14.6, PAL.top - .35, 7, 1.3, { pr: .32 })], T, { ahead: 28, delay: d });
+  addRow(lampLine(-12, PAL.ter + 2.05, 12, PAL.ter + 2.05, 17, 7.05, { pr: .26 }), T, { ahead: 28, delay: d + .5 });
+  addRow(lampLine(-12.2, PAL.ter - .35, 12.2, PAL.ter - .35, 19, 9.05, { pr: .26 }), T, { ahead: 28, delay: d + 1.1 });
+  for (const [x, r, n] of [[0, 3.4, 14], [-8, 2, 9], [8, 2, 9]]) addRow(Array.from({ length: n }, (_, i) => { const a = i/n*TAU + PI/2; return addLamp(x + (r + .45)*Math.cos(a), 9.05, -59.5 + (r + .45)*Math.sin(a), { pr: .26 }); }), T, { ahead: 28, delay: d + 1.7 });
+}
+function groundAt(x, z){
+  if (G.vimLanded && ((x - VIM_END.x)/3.05)**2 + ((z - VIM_END.z)/4.25)**2 < 1) return DECK_Y;
+  if (Math.abs(x) < 6.4 && z < STEP_Z && z > PAL.top) return Math.min(5, Math.ceil((STEP_Z - z)/1.1))*.25;
+  if (Math.abs(x) < 15 && z <= PAL.top && z > PAL.ter) return 1.25;
+  return 0; }
+
+/* ---------------- the Pushpaka Vimana: a small flying chariot, itself a floating platform ---------------- */
+const vim = new THREE.Group(); world.add(vim);
+{ vim.add(at(mk(new THREE.CylinderGeometry(1, .93, .32, 32), WHITE, { noShadow: true }), 0, DECK_Y - .16, 0)); vim.children[0].scale.set(3.2, 1, 4.4);
+  const rim = mk(new THREE.CylinderGeometry(1, 1, .14, 32, 1, true), GOLD, { noShadow: true }); rim.scale.set(3.24, 1, 4.44); rim.position.y = DECK_Y - .07; vim.add(rim);
+  const belly = mk(latheG([[0, -1.05], [.45, -.98], [.8, -.62], [.97, -.25], [1, 0]], 18), GOLD, { noShadow: true }); belly.scale.set(3.05, 1, 4.2); belly.position.y = DECK_Y - .3; vim.add(belly);
+  for (let i = 0; i < 14; i++){ const a = i/14*TAU, p = mk(ellG(.42, .1, .95), BLUSH, { flat: 0, noShadow: true }); p.position.set(2.75*Math.cos(a), DECK_Y - .62, 3.8*Math.sin(a));
+    vim.add(p); p.lookAt(new V3(4.2*Math.cos(a), DECK_Y - 1.25, 5.8*Math.sin(a))); }
+  ball(vim, new V3(0, DECK_Y - 1.42, 0), .45, BLUSH, { noShadow: true });
+  const post = a => new V3(3.0*Math.cos(a), DECK_Y, 4.15*Math.sin(a));
+  for (let i = 0; i < 18; i++){ const a = i/18*TAU, b = (i + 1)/18*TAU; if (Math.sin(a) < -.8 || Math.sin(b) < -.8) continue;
+    rod(vim, post(a), post(a).add(new V3(0, .7, 0)), .035, GOLD, { noShadow: true }); rod(vim, post(a).add(new V3(0, .7, 0)), post(b).add(new V3(0, .7, 0)), .025, GOLD, { noShadow: true }); }
+  for (const [x, z] of [[-1.35, 1.1], [1.35, 1.1], [-1.35, 3.1], [1.35, 3.1]]) rod(vim, new V3(x, DECK_Y, z), new V3(x, DECK_Y + 2.5, z), .08, WHITE, { noShadow: true, s: 9 });
+  box(vim, -1.7, DECK_Y + 2.5, .75, 1.7, DECK_Y + 2.72, 3.45, GOLD, { noShadow: true });
+  vim.add(at(mk(latheG([[0, 0], [1.5, 0], [1.25, .7], [.75, 1.45], [.3, 2.0], [0, 2.2]], 12), GOLD, { noShadow: true }), 0, DECK_Y + 2.72, 2.1));
+  ball(vim, new V3(0, DECK_Y + 5.05, 2.1), .16, TOMATO, { noShadow: true });
+  for (const [x, z] of [[-1.25, -3.75], [1.25, -3.75], [-2.55, -2.3], [2.55, -2.3]]){ rod(vim, new V3(x, DECK_Y, z), new V3(x, DECK_Y + .75, z), .05, GOLD, { noShadow: true });
+    vim.add(at(mk(latheG([[0, 0], [.13, .06], [.15, .18], [.08, .32], [0, .4]], 10), BLUSH, { noShadow: true }), x, DECK_Y + .75, z)); }
+}
+const VIM_START = new V3(16, 24, EDGE_S + 82);
+function vimPose(u){ const e = ease(u), p = VIM_START.clone().lerp(VIM_END, e); p.y = VIM_END.y + (VIM_START.y - VIM_END.y)*Math.pow(1 - sm(clamp(u*1.05)), 1.4) + (u < 1 ? Math.sin(u*9)*.12*(1 - u) : 0);
+  return { p, yaw: .5*(1 - sm(u)), roll: .1*Math.sin(u*PI)*(1 - u) }; }
+const vimLocal = (x, z) => { const c = Math.cos(vim.rotation.y), s = Math.sin(vim.rotation.y); return new V2(vim.position.x + x*c + z*s, vim.position.z - x*s + z*c); };
+
+/* ---------------- characters ---------------- */
+const DEFS = [
+  { id: 'sita', name: 'Sita', skin: SK1, low: MARIGOLD, top: TOMATO, sari: true, braid: true, border: GOLD, ride: [-1.45, -.2] },
+  { id: 'lakshmana', name: 'Lakshmana', skin: SK1, low: MUSTARD, top: SAFFRON, jata: GOLD, bow: true, ride: [1.45, 0] },
+  { id: 'hanuman', name: 'Hanuman', skin: SAFFRON, low: TOMATO, top: SAFFRON, muzzle: SAFFRON, tail: true, gada: true, crown: true, ride: [1.1, 2.2] },
+  { id: 'bharata', name: 'Bharata', skin: SK2, low: EARTH, top: EARTH, jata: BARK, thali: true, at: [.9, ZN], face: 0 },
+  { id: 'nelder', name: 'Nandigram elder', skin: SK1, low: WHITE, top: WHITE, hat: WHITE, beard: true, staff: true, at: [-5.4, ZN + 2.3], face: .4 },
+  { id: 'nwoman', name: 'Nandigram woman', skin: SK2, low: TEAL, top: MUSTARD, sari: true, bun: true, thali: true, at: [4.4, ZN - 1.4], face: -.5 },
+  { id: 'guard1', name: 'Gate guard', skin: SK2, low: WHITE, top: TOMATO, hat: SAFFRON, staff: true, at: [-2.2, GATE_Z - 2.4], face: 1.1 },
+  { id: 'guard2', name: 'Gate guard', skin: SK1, low: WHITE, top: TOMATO, hat: SAFFRON, staff: true, at: [2.2, GATE_Z - 2.4], face: -1.1 },
+  { id: 'kaushalya', name: 'Kaushalya', skin: SK1, low: WHITE, top: WHITE, veil: WHITE, sari: true, border: GOLD, at: [-2.5, MOTHER_Z], face: 0, mother: true },
+  { id: 'kaikeyi', name: 'Kaikeyi', skin: SK2, low: WHITE, top: WHITE, veil: WHITE, sari: true, border: PLUM, at: [0, MOTHER_Z - .4], face: 0, mother: true, thali: true },
+  { id: 'sumitra', name: 'Sumitra', skin: SK1, low: WHITE, top: WHITE, veil: WHITE, sari: true, border: TEAL, at: [2.5, MOTHER_Z], face: 0, mother: true },
+  // the families of today
+  { id: 'riya', name: 'Riya', today: true, skin: SK2, low: BLUSH, top: TEAL, sari: true, braid: true, scale: .72, at: [8.5, CHZ - 1.35], face: .5 },
+  { id: 'mother', name: 'Riya\'s mother', today: true, skin: SK1, low: PLUM, top: MARIGOLD, sari: true, bun: true, border: GOLD, thali: true, at: [4.7, CHZ + 5.5], face: -1.2 },
+  { id: 'nani', name: 'Nani', today: true, skin: SK1, low: WHITE, top: TEAL, sari: true, veil: WHITE, border: TEAL, at: [11.75, CHZ - 3.05], face: -PI/2 - .5, y: .45 },
+  { id: 'father', name: 'Riya\'s father', today: true, skin: SK2, low: WHITE, top: MARIGOLD, at: [11.6, CHZ - .85], face: -PI/2 + .5, y: .45 },
+  { id: 'kabir', name: 'Kabir', today: true, skin: SK2, low: WHITE, top: TEAL, scale: .66, at: [2.4, CHZ - 1.2], face: -2 },
+  { id: 'kamala', name: 'Kamala aunty', today: true, skin: SK2, low: TOMATO, top: GOLD, sari: true, bun: true, border: GOLD, at: [4.3, CHZ - 5.4], face: -.8, plate: true },
+  { id: 'p1', name: 'Neighbour', today: true, skin: SK1, low: INDIGO, top: WHITE, sari: true, bun: true, thali: true, at: [-2.3, 14], face: 1.4 },
+  { id: 'p2', name: 'Neighbour', today: true, skin: SK2, low: WHITE, top: SAFFRON, at: [2.2, -15], face: -1.2 },
+  { id: 'p3', name: 'Neighbour', today: true, skin: SK1, low: TEAL, top: MUSTARD, scale: .7, at: [1.4, -16.2], face: -1.6 },
+];
+VILL.forEach(v => DEFS.push({ ...v, at: [v.door.x, v.door.y], face: v.side > 0 ? -PI/2 : PI/2, villager: true }));
+const NPC = {}, NPCS = DEFS.map((d, i) => { const b = person(d);
+  const n = { d, ...b, pos: new V2(...(d.at || [0, EDGE_S])), y: d.y || 0, h: d.face || 0, target: null, speed: 1.6, mode: d.ride ? 'ride' : 'idle', pose: d.thali ? 'hold' : 'down', walkT: rnd()*9, idx: i,
+    said: false, out: false };
+  NPC[d.id] = n; return n; });
+const COMP = ['sita', 'lakshmana', 'hanuman'].map(k => NPC[k]), MOTHERS = ['kaushalya', 'kaikeyi', 'sumitra'];
+const SPEAKER = {}; NPCS.forEach(n => SPEAKER[n.d.name] = SPEAKER[n.d.name] || n);
+VILL.forEach(v => { const n = NPC[v.id]; n.g.visible = false; n.mode = 'hidden'; v.npc = n; });
+NPCS.filter(n => n.d.today).forEach(n => n.g.visible = false);
+// Kamala aunty's plate of mithai
+{ const n = NPC.kamala, p = thali(n.g, 0, .98, .36, false); for (const [x, z, P] of [[0, 0, MARIGOLD], [.09, .05, MARIGOLD], [-.08, .06, MARIGOLD], [.05, -.09, WHITE], [-.07, -.07, BLUSH]]) ball(p, new V3(x, .06, z), .045, P, { noShadow: true }); n.pose = 'hold'; n.plate = p; }
+// Ramayana villagers come out of their doors with a lamp when their row lights
+for (const r of ROWS) if (r.who) r.who.row = r;
+
+/* ---------------- today's props: rangoli, powder bowls, the wall of diyas, the Lakshmi puja ---------------- */
+const today = new THREE.Group(); world.add(today); today.visible = false;
+const RC = new V3(9.3, 0, CHZ - .2);
+const PETALS = [], BOWLS = [];
+const RCOL = [TOMATO, MARIGOLD, TEAL, BLUSH, WHITE];
+const PAPERP = pal('#fbf7ec', '#f1ead8', '#cfc4ad');
+{ const petal = (r0, r1, w) => { const s = new THREE.Shape(); s.moveTo(r0, 0); s.quadraticCurveTo((r0 + r1)/2, w, r1, 0); s.quadraticCurveTo((r0 + r1)/2, -w, r0, 0);
+    return new THREE.ShapeGeometry(s, 6).rotateX(-PI/2); };
+  const add = (g, a, P, y, empty) => { const m = mk(g, P, { noShadow: true }); m.rotation.y = a; m.position.set(RC.x, y, RC.z); today.add(m); if (empty !== undefined) PETALS.push({ m, a, empty, done: !empty, r: 0 }); return m; };
+  today.add(at(mk(new THREE.CircleGeometry(1.25, 40).rotateX(-PI/2), WHITE, { noShadow: true }), RC.x, .012, RC.z));
+  const big = petal(.36, 1.08, .3), small = petal(.16, .5, .13);
+  for (let i = 0; i < 8; i++){ const a = i/8*TAU, e = [1, 4, 6].includes(i); const m = add(big, a, e ? PAPERP : (i%2 ? TEAL : BLUSH), .02, e); PETALS[PETALS.length - 1].r = .72; }
+  for (let i = 0; i < 8; i++){ const a = i/8*TAU + PI/8, e = i === 2; add(small, a, e ? PAPERP : TOMATO, .026, e); PETALS[PETALS.length - 1].r = .33; }
+  today.add(at(mk(new THREE.CircleGeometry(.15, 20).rotateX(-PI/2), MARIGOLD, { noShadow: true }), RC.x, .03, RC.z));
+  for (let i = 0; i < 16; i++){ const a = i/16*TAU; ball(today, new V3(RC.x + 1.17*Math.cos(a), .02, RC.z + 1.17*Math.sin(a)), .045, i%2 ? WHITE : MARIGOLD, { noShadow: true, h: 5 }); }
+  RCOL.forEach((P, i) => { const g = new THREE.Group(); g.position.set(RC.x - 1 + i*.5, 0, RC.z + 1.95); g.add(mk(latheG([[0, 0], [.1, 0], [.16, .08], [.14, .1], [0, .06]], 12), CLAY, { noShadow: true }));
+    g.add(at(mk(latheG([[0, 0], [.12, 0], [.06, .07], [0, .1]], 10), P, { noShadow: true }), 0, .06, 0)); today.add(g); BOWLS.push({ g, P }); });
+  for (const PP of PETALS) PP.pos = new V3(RC.x + Math.sin(PP.a + PI/2)*0 + Math.cos(PP.a)*PP.r, .03, RC.z - Math.sin(PP.a)*PP.r);
+}
+const PETALS_EMPTY = PETALS.filter(p => p.empty).length;
+// the family's low wall with a row of unlit diyas
+const WALLN = 12, WALL_Z = CHZ + 6.1, WALLD = [];
+{ box(today, 5.5, 0, WALL_Z - .2, 12.4, .9, WALL_Z + .2, MUD); box(today, 5.4, .9, WALL_Z - .26, 12.5, 1.0, WALL_Z + .26, ROCK); castShadow(today.children[today.children.length - 1]);
+  for (let i = 0; i < WALLN; i++){ const d = diya(today, 5.9 + i*.55, 1.0, WALL_Z); d.userData.flame.forEach(f => f.visible = false);
+    const p = new THREE.Mesh(poolG, poolMat); p.layers.set(1); p.renderOrder = 3; p.position.set(5.9 + i*.55, .02, WALL_Z - .55); p.scale.setScalar(.001); today.add(p);
+    WALLD.push({ d, p, lit: false, t: 0 }); } }
+BOXES.push([5.4, WALL_Z - .3, 12.5, WALL_Z + .3]);
+// the Lakshmi puja on the family's verandah: a low chowki, Lakshmi on a lotus, a kalash, a bell, the aarti lamp, flowers
+const SHRINE = new V3(11.8, .45, CHZ - 1.95), PUJA = {};
+{ const g = new THREE.Group(); g.position.copy(SHRINE); today.add(g);
+  box(g, -.35, 0, -.42, .35, .34, .42, BARK); box(g, -.38, .34, -.45, .38, .38, .45, TOMATO);
+  for (let i = 0; i < 10; i++){ const a = i/10*TAU, p = mk(ellG(.1, .03, .2), BLUSH, { flat: 0, noShadow: true }); p.position.set(.06 + .12*Math.cos(a), .42, .12*Math.sin(a)); g.add(p); p.lookAt(new V3(.06 + .6*Math.cos(a), .55, .6*Math.sin(a)).add(SHRINE)); }
+  const L = new THREE.Group(); L.position.set(.06, .44, 0); L.rotation.y = -PI/2; L.scale.setScalar(.36); g.add(L);
+  L.add(mk(latheG([[0, 0], [.42, 0], [.3, .3], [0, .3]], 14), TOMATO)); L.add(at(mk(latheG([[0, 0], [.2, 0], [.25, .45], [0, .45]], 14), GOLD), 0, .3, 0));
+  ball(L, new V3(0, .95, 0), .2, SK1); ball(L, new V3(0, 1.0, -.04), .205, HAIR); L.add(mk(latheG([[0, 1.1], [.16, 1.1], [.17, 1.2], [.1, 1.35], [0, 1.42]], 10), GOLD));
+  for (const s of [1, -1]){ rod(L, new V3(s*.24, .7, 0), new V3(s*.4, .5, .2), .06, SK1); ball(L, new V3(s*.4, .5, .2), .07, SK1); }
+  for (let i = 0; i < 5; i++) ball(L, new V3(-.2 + i*.1, .3, .38), .045, GOLD, { flat: 1, w: 6, h: 3 });
+  const k = new THREE.Group(); k.position.set(-.18, .38, .28); g.add(k); k.add(mk(latheG([[0, 0], [.07, 0], [.11, .07], [.09, .14], [.05, .16], [.06, .19], [0, .19]], 12), GOLD));
+  for (let i = 0; i < 5; i++){ const a = i/5*TAU; const m = mk(ellG(.025, .012, .08), LEAF, { flat: 0, noShadow: true }); m.position.set(.05*Math.cos(a), .21, .05*Math.sin(a)); m.rotation.y = -a; m.rotation.z = .5; k.add(m); }
+  ball(k, new V3(0, .25, 0), .055, BARK);
+  PUJA.bell = new THREE.Group(); PUJA.bell.position.set(-.2, .38, -.3); g.add(PUJA.bell);
+  PUJA.bell.add(mk(latheG([[0, 0], [.06, 0], [.045, .07], [.02, .1], [0, .1]], 12), GOLD)); rod(PUJA.bell, new V3(0, .1, 0), new V3(0, .19, 0), .01, GOLD); ball(PUJA.bell, new V3(0, .2, 0), .02, GOLD);
+  PUJA.lamp = thali(g, -.22, .38, .02); PUJA.lamp.scale.setScalar(.8);
+  PUJA.basket = new THREE.Group(); PUJA.basket.position.set(-.25, .38, .38); g.add(PUJA.basket);
+  PUJA.basket.add(mk(latheG([[0, 0], [.08, 0], [.12, .07], [0, .05]], 12), BARK)); for (let i = 0; i < 6; i++) ball(PUJA.basket, new V3(.06*Math.cos(i), .08, .06*Math.sin(i)), .035, i%2 ? MARIGOLD : TOMATO, { noShadow: true });
+  PUJA.flowers = []; for (let i = 0; i < 6; i++){ const f = ball(g, new V3(.25, .38, -.3 + i*.12), .04, i%2 ? MARIGOLD : TOMATO, { noShadow: true }); f.visible = false; PUJA.flowers.push(f); }
+  diya(g, .25, .38, .3, .8); castShadow(g); }
+// akash kandils (paper lanterns) and kids' sparklers for today
+{ for (const [x, z] of [[6.3, 18.6], [-6.3, 12.6], [6.3, -13.2], [-6.3, -19.2], [-6.3, 24.6], [6.3, -25.2]]){
+    const g = new THREE.Group(); g.position.set(x, 3.0, z); today.add(g); rod(g, new V3(0, .7, 0), new V3(0, .32, 0), .01, flatP(INK), { noShadow: true });
+    g.add(mk(latheG([[0, -.3], [.24, 0], [0, .3]], 6), MARIGOLD, { emis: 1, noShadow: true })); g.add(at(mk(latheG([[0, -.12], [.27, 0], [0, .12]], 6), TOMATO, { emis: 1, noShadow: true }), 0, 0, 0));
+    for (const dx of [-.12, 0, .12]) rod(g, new V3(dx, -.28, 0), new V3(dx*1.2, -.62, 0), .012, TOMATO, { noShadow: true }); } }
+// fireworks: a few flat ink-outlined star bursts
+const BURSTS = Array.from({ length: 3 }, (_, k) => { const g = new THREE.Group(), P = [MARIGOLD, TOMATO, TEAL][k];
+  for (let i = 0; i < 12; i++){ const a = i/12*TAU; rod(g, new V3(Math.cos(a)*.25, Math.sin(a)*.25, 0), new V3(Math.cos(a), Math.sin(a), 0), .035, flatP(P.l), { emis: 1, noShadow: true, r1: .012 });
+    ball(g, new V3(Math.cos(a)*1.12, Math.sin(a)*1.12, 0), .06, flatP(GOLD.l), { emis: 1, noShadow: true }); }
+  ball(g, new V3(), .12, flatP(CORE), { emis: 1, noShadow: true }); g.visible = false; g.userData.t = 99; world.add(g); return g; });
+// small particles: powder puffs, dust, sparks
+const parts = Array.from({ length: 50 }, (_, i) => { const m = ball(world, new V3(), 1, EARTH, { flat: 1, w: 6, h: 4, noShadow: true }); m.visible = false; m.userData.v = new V3(); m.userData.life = 0; return m; });
+function emit(p, v, s = .2, life = 1.5, P = null){ const m = parts.find(q => !q.visible); if (!m) return; m.visible = true; m.position.copy(p); m.userData.v.copy(v); m.userData.life = life; m.scale.setScalar(s);
+  m.material = toon(P || EARTH, 1); }
+
+/* ---------------- lamp meshes (instanced) ---------------- */
+let lampBowl, lampFlame, lampCore, lampPool;
+{ const N = LAMPS.length;
+  const mats = LAMPS.map(L => TRS(L.x, L.y, L.z, L.k)), zero = TRS(0, -50, 0, 0);
+  lampBowl = instanced(latheG([[0, 0], [.07, 0], [.15, .07], [.13, .1], [0, .08]], 10), CLAY, mats);
+  lampFlame = instanced(latheG([[0, 0], [.05, .03], [.04, .1], [0, .2]], 8), flatP(FLAME), LAMPS.map(() => zero), { emis: 1 });
+  lampCore = instanced(latheG([[0, 0], [.022, .02], [0, .1]], 6), flatP(CORE), LAMPS.map(() => zero), { emis: 1 });
+  lampPool = new THREE.InstancedMesh(poolG, poolMat, N); for (let i = 0; i < N; i++) lampPool.setMatrixAt(i, zero);
+  lampPool.layers.set(1); lampPool.renderOrder = 3; lampPool.frustumCulled = false; world.add(lampPool);
+  lampBowl.userData.far = 34; lampFlame.userData.far = 26; lampCore.userData.far = 26;
+  for (const m of [lampFlame, lampCore, lampPool]) m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); }
+function setTS(A, i, x, y, z, sx, sy, sz){ const o = i*16; A.fill(0, o, o + 16); A[o] = sx; A[o + 5] = sy; A[o + 10] = sz; A[o + 12] = x; A[o + 13] = y; A[o + 14] = z; A[o + 15] = 1; }
+
+/* ---------------- Rama's own hands, bow and quiver (first person) ----------------
+   Same spec on both Rama islands (PLAN.md "Hands"): eye height 1.6 m, hands in Krishna blue (KBLUE) with gold bangles,
+   a bow (dhanush) in the left hand, and a quiver tip at the right shoulder that shows when you look down. */
+const vm = new THREE.Group(); scene.add(vm);         // follows the view (tips with your gaze)
+const bodyF = new THREE.Group(); scene.add(bodyF);   // yaw only, at the eye: the quiver on your back
+const feetF = new THREE.Group(); scene.add(feetF);   // yaw only, on the ground: your feet (and padukas)
+const H = {};
+{ for (const s of ['L', 'R']){ H['arm' + s] = rod(vm, new V3(), new V3(0, 1, 0), .031, KBLUE, { r1: .026, noShadow: true, s: 9 });
+    H['hand' + s] = mk(ellG(.047, .041, .064), KBLUE, { flat: 0, noShadow: true }); vm.add(H['hand' + s]);
+    H['bang' + s] = [0, 1].map(() => { const m = mk(new THREE.TorusGeometry(.037, .0095, 6, 18).rotateX(PI/2), GOLD, { flat: 0, noShadow: true }); vm.add(m); return m; });
+    H['thumb' + s] = rod(vm, new V3(), new V3(0, 1, 0), .018, KBLUE, { r1: .015, noShadow: true });
+    H['fing' + s] = [0, 1, 2].map(() => rod(vm, new V3(), new V3(0, 1, 0), .015, KBLUE, { r1: .013, noShadow: true })); }
+  // the bow: a tapered recurve in the local YZ plane, grip at the origin, string on the +Z side
+  const Lb = .6, c = .2, pts = [], rad = [];
+  for (let i = 0; i <= 26; i++){ const u = -1.09 + i/26*2.18, au = Math.abs(u), y = u*Lb, z = au <= 1 ? c*u*u : c - (au - 1)*Lb*1.15;
+    pts.push(new V3(0, y, z)); rad.push(au < .1 ? .013 : Math.max(.005, .011*(1 - .5*au))); }
+  H.bow = new THREE.Group(); vm.add(H.bow);
+  H.bow.add(mk(tubeG(pts, rad), BARK, { flat: 0, noShadow: true }));
+  H.bow.add(mk(rodG(.0145, .0145, 9), TOMATO, { noShadow: true })); H.bow.children[1].scale.set(1, .1, 1);
+  for (const sgn of [1, -1]) ball(H.bow, pts[sgn > 0 ? 26 : 0], .011, GOLD, { noShadow: true });
+  H.string = rod(H.bow, new V3(0, -Lb, c), new V3(0, Lb, c), .0022, flatP(INK), { noShadow: true });
+  // what Rama holds in his right hand in today's scene
+  H.held = new THREE.Group(); vm.add(H.held);
+  H.pinch = ball(H.held, new V3(0, .03, -.03), .028, TOMATO, { noShadow: true });
+  H.diya = diya(H.held, -.02, .02, 0, .5);
+  H.aarti = thali(H.held, -.02, .02, 0); H.aarti.scale.setScalar(.36);
+  H.sweet = ball(H.held, new V3(0, .04, -.02), .035, MARIGOLD, { noShadow: true });
+  // quiver on the back: its mouth and the arrow ends sit at the right shoulder
+  const qa = new V3(.15, -.2, -.01), qb = new V3(.27, -.62, .24), qd = qa.clone().sub(qb).normalize();
+  rod(bodyF, qb, qa, .046, BARK, { r1: .05, noShadow: true, s: 10 });
+  for (const t of [.12, .82]) bodyF.add(at(mk(new THREE.TorusGeometry(.049, .008, 5, 14), GOLD, { flat: 0, noShadow: true }), 0, 0, 0)), bodyF.children[bodyF.children.length - 1].position.copy(qb.clone().lerp(qa, t)), bodyF.children[bodyF.children.length - 1].quaternion.setFromUnitVectors(new V3(0, 0, 1), qd);
+  for (let i = 0; i < 5; i++){ const o = new V3((i%3 - 1)*.018, 0, (i < 3 ? -.01 : .014)), b0 = qa.clone().add(o).addScaledVector(qd, -.04), e = qa.clone().add(o).addScaledVector(qd, .05 + (i%2)*.012);
+    rod(bodyF, b0, e, .003, BARK, { noShadow: true }); rod(bodyF, e.clone().addScaledVector(qd, -.03), e, .0065, i%2 ? TOMATO : WHITE, { noShadow: true, r1: .002, s: 4 }); }
+  // feet, bare until Bharata gives back the padukas
+  H.feet = [-1, 1].map(s => { const g = new THREE.Group(); feetF.add(g); const f = mk(ellG(.046, .034, .115), KBLUE, { flat: 0, noShadow: true }); f.position.set(0, .04, -.02); g.add(f);
+    ball(g, new V3(-s*.022, .036, -.13), .022, KBLUE, { noShadow: true });
+    const p = new THREE.Group(); g.add(p); box(p, -.055, 0, -.16, .055, .022, .13, BARK, { noShadow: true }); rod(p, new V3(-s*.012, .02, -.1), new V3(-s*.012, .072, -.1), .008, GOLD, { noShadow: true });
+    ball(p, new V3(-s*.012, .078, -.1), .013, GOLD, { noShadow: true }); p.visible = false; g.userData.pad = p; g.userData.s = s; return g; });
+}
+const POSE = {
+  rest:  { sL: [-.27, -.66, -.1], hL: [-.3, -.27, -.6], sR: [.28, -.64, -.12], hR: [.26, -.4, -.52], bu: [-.15, .95, -.27] },
+  hold:  { sL: [-.27, -.66, -.1], hL: [-.31, -.29, -.58], sR: [.28, -.62, -.12], hR: [.15, -.3, -.47], bu: [-.18, .93, -.3] },
+  pinch: { sL: [-.27, -.66, -.1], hL: [-.32, -.3, -.58], sR: [.28, -.62, -.12], hR: [.11, -.38, -.47], bu: [-.2, .93, -.3] },
+  aarti: { sL: [-.27, -.66, -.1], hL: [-.33, -.33, -.56], sR: [.28, -.62, -.12], hR: [.06, -.22, -.53], bu: [-.22, .92, -.3] },
+};
+const vmP = JSON.parse(JSON.stringify(POSE.rest));
+const A3 = a => new V3(a[0], a[1], a[2]);
+function poseHands(dt, target){ const T = POSE[target], k = 1 - Math.exp(-dt*7);
+  for (const key in vmP) for (let i = 0; i < 3; i++) vmP[key][i] = lerp(vmP[key][i], T[key][i], k);
+  const circ = G.aartiT > 0 ? new V3(Math.cos(G.aartiT*2.4)*.07, Math.sin(G.aartiT*2.4)*.06, 0) : new V3();
+  for (const s of ['L', 'R']){ const sh = A3(vmP['s' + s]), hd = A3(vmP['h' + s]); if (s === 'R') hd.add(circ); const dir = hd.clone().sub(sh).normalize();
+    const wrist = hd.clone().addScaledVector(dir, -.06); setRod(H['arm' + s], sh, wrist);
+    H['hand' + s].position.copy(hd); H['hand' + s].quaternion.setFromUnitVectors(new V3(0, 0, -1), dir);
+    H['bang' + s].forEach((m, i) => { m.position.copy(hd).addScaledVector(dir, -.088 - i*.024); m.quaternion.setFromUnitVectors(UP, dir); });
+    const th = hd.clone().add(new V3(s === 'L' ? .045 : -.045, .03, 0)); setRod(H['thumb' + s], hd, th.addScaledVector(dir, .032));
+    const side = new V3().crossVectors(dir, UP).normalize(), curl = new V3().crossVectors(side, dir).normalize().multiplyScalar(-1), grip = s === 'L' ? 1.5 : 1;
+    H['fing' + s].forEach((m, i) => { const b0 = hd.clone().addScaledVector(dir, .044).addScaledVector(side, (i - 1)*.023); setRod(m, b0, b0.clone().addScaledVector(dir, .024/grip).addScaledVector(curl, .034*grip)); });
+    if (s === 'R'){ H.held.position.copy(hd).addScaledVector(curl, -.03).add(new V3(0, .035, 0)); } }
+  // the bow sits in the left fist: limbs along bu, string turned towards you
+  const Y = A3(vmP.bu).normalize(), Zr = new V3(1, 0, .15), Z = Zr.addScaledVector(Y, -Zr.dot(Y)).normalize(), X = new V3().crossVectors(Y, Z);
+  H.bow.quaternion.setFromRotationMatrix(_m.makeBasis(X, Y, Z)); H.bow.position.copy(A3(vmP.hL)).addScaledVector(Z, -.012);
+  H.pinch.visible = G.holding === 'pinch'; H.diya.visible = G.holding === 'diya'; H.aarti.visible = G.holding === 'aarti'; H.sweet.visible = G.holding === 'sweet';
+  if (G.colour) H.pinch.material = toon(G.colour, 0);
+}
+
+/* ---------------- state ---------------- */
+const player = { pos: new V2(0, EDGE_S), y: 0, yaw: 0, pitch: -.08, bob: 0, eye: 1.6, pose: 'rest', vel: 0, stepI: 0 };
+const G = { beat: 'title', step: 0, t: 0, beatT: 0, night: .5, stuck: 0, talked: {}, dlg: null, glowing: [], hintShown: 0, objTarget: null, hints: [],
+  arriveT: 0, vimLanded: false, padT: 0, padWorn: false, lampsOn: false, warm: new THREE.Vector4(999, 999, 0, 0), bowT: 0, colour: null, filled: 0,
+  wallLit: 0, puja: {}, aartiT: 0, holding: null, ended: false, paused: false, started: false, veiled: false, today: false, shake: 0, from: '', drone: 0 };
+const inp = { f: 0, b: 0, l: 0, r: 0, mdx: 0, mdy: 0 };
+const SET = { wob: 2.4, grain: .8, sens: 1, vol: .7 };
+
+/* ---------------- sound: lamp ticks, bells, wooden padukas, crickets, a soft drone ---------------- */
+const sfx = (() => {
+  let ctx = null, master, noiseBuf, humG, murG, droneG, crickT = 0, lastTick = 0;
+  const PENTA = [1174.66, 1318.51, 1479.98, 1760, 1975.53, 2349.32, 2637.02, 2959.96, 3520];
+  function init(){ if (ctx) return; try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
+    master = ctx.createGain(); master.gain.value = SET.vol; master.connect(ctx.destination);
+    noiseBuf = ctx.createBuffer(1, ctx.sampleRate*2, ctx.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random()*2 - 1;
+    const loop = () => { const s = ctx.createBufferSource(); s.buffer = noiseBuf; s.loop = true; s.start(); return s; };
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 240; humG = ctx.createGain(); humG.gain.value = 0; loop().connect(lp); lp.connect(humG); humG.connect(master);
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 520; bp.Q.value = .6; murG = ctx.createGain(); murG.gain.value = 0; loop().connect(bp); bp.connect(murG); murG.connect(master);
+    droneG = ctx.createGain(); droneG.gain.value = 0; const dl = ctx.createBiquadFilter(); dl.type = 'lowpass'; dl.frequency.value = 700; dl.connect(droneG); droneG.connect(master);
+    for (const f of [146.83, 220, 293.66]){ const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; const g = ctx.createGain(); g.gain.value = f > 200 ? .25 : .4; o.connect(g); g.connect(dl); o.start(); } }
+  function env(g, t, a, peak, rel){ g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + rel); }
+  function tone(f, t, v, rel, type = 'sine'){ const o = ctx.createOscillator(), g = ctx.createGain(); o.type = type; o.frequency.value = f; o.connect(g); g.connect(master); env(g, t, .004, v, rel); o.start(t); o.stop(t + rel + .05); }
+  return {
+    init, get on(){ return !!ctx; }, vol(v){ if (master) master.gain.value = v; },
+    tick(n = 0){ if (!ctx) return; const t = ctx.currentTime; if (t - lastTick < .045) return; lastTick = t; const f = PENTA[((n%9) + 9)%9];
+      tone(f, t, .045, .22); tone(f*2.01, t, .012, .12, 'triangle'); },
+    bell(f = 880){ if (!ctx) return; const t = ctx.currentTime; for (const [m, v] of [[1, .12], [1.507, .06], [2.51, .03]]) tone(f*m, t, v, 1.8); },
+    clack(){ if (!ctx) return; const t = ctx.currentTime, n = ctx.createBufferSource(); n.buffer = noiseBuf; const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1700; bp.Q.value = 4;
+      const g = ctx.createGain(); n.connect(bp); bp.connect(g); g.connect(master); env(g, t, .002, .16, .06); n.start(t, Math.random()); n.stop(t + .1); tone(260 + Math.random()*40, t, .05, .07, 'triangle'); },
+    pop(){ if (!ctx) return; const t = ctx.currentTime, n = ctx.createBufferSource(); n.buffer = noiseBuf; const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900;
+      const g = ctx.createGain(); n.connect(lp); lp.connect(g); g.connect(master); env(g, t, .005, .35, .5); n.start(t, Math.random()); n.stop(t + .7);
+      for (let i = 0; i < 6; i++) tone(2000 + Math.random()*2500, t + .15 + Math.random()*.5, .015, .05); },
+    whoosh(){ if (!ctx) return; const t = ctx.currentTime; humG.gain.cancelScheduledValues(t); humG.gain.setValueAtTime(humG.gain.value, t); humG.gain.linearRampToValueAtTime(.0001, t + 1.2); },
+    step(dt){ if (!ctx) return; humG.gain.value = G.beat === 'arrive' ? .28*(1 - clamp((G.arriveT - 7)/1.5)) : Math.max(0, humG.gain.value - dt*.3);
+      const lit = clamp(litCount/220); murG.gain.value = G.today ? .035 : ['walk', 'mothers', 'lit'].includes(G.beat) ? .05*lit : 0;
+      G.drone = clamp(G.drone + (['lit', 'finale'].includes(G.beat) || G.puja.aarti ? dt*.4 : -dt*.3)); droneG.gain.value = .045*G.drone;
+      crickT -= dt; if (crickT <= 0 && litCount < 80 && !G.today){ crickT = .9 + Math.random()*1.6; const t = ctx.currentTime; for (let i = 0; i < 3; i++) tone(4300 + Math.random()*300, t + i*.055, .012, .035); } },
+  };
+})();
+
+/* ---------------- HUD ---------------- */
+const objEl = $('obj'), hintEl = $('hint'), promptEl = $('prompt'), cueEl = $('cue'), statsEl = $('stats'), crossEl = $('cross'), capEl = $('cap');
+function objective(text, target, hints = []){ G.objText = text; G.objTarget = target; G.hints = hints; G.stuck = 0; G.hintShown = 0; hintEl.classList.remove('show'); lastDist = 1e9;
+  objEl.innerHTML = text ? `<span class="k">Now</span>${text}` : ''; objEl.classList.add('new'); setTimeout(() => objEl.classList.remove('new'), 900); }
+function progress(){ G.stuck = 0; if (G.hintShown){ G.hintShown = 0; hintEl.classList.remove('show'); } }
+let promptHTML = '';
+function prompt(html){ if (html === promptHTML) return; promptHTML = html; promptEl.innerHTML = html; promptEl.classList.toggle('show', !!html); crossEl.classList.toggle('on', !!html); }
+const KEY = k => `<span class="key">${k}</span>`;
+function caption(html){ capEl.innerHTML = html || ''; capEl.classList.toggle('show', !!html); }
+let statsHTML = '';
+function drawStats(){ const L = [];
+  if (['walk', 'mothers', 'lit'].includes(G.beat) && litCount > 0) L.push(['Lamps lit', litCount]);
+  if (G.beat === 'rangoli' && G.step > 0) L.push(['Petals filled', `${G.filled} of ${PETALS_EMPTY}`]);
+  if (G.beat === 'diyas' && G.step > 0) L.push(['Diyas on the wall', `${G.wallLit} of ${WALLN}`]);
+  const h = L.map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+  if (h !== statsHTML){ statsHTML = h; statsEl.innerHTML = h; } }
+const bubbles = [];
+function say(n, text, dur = 3.4){ if (!n || !n.g.visible) return; let b = bubbles.find(x => x.n === n);
+  if (!b){ const el = document.createElement('div'); el.className = 'bub'; $('hud').appendChild(el); b = { el, n }; bubbles.push(b); }
+  b.el.innerHTML = `<b>${n.d.name}</b>${text}`; b.until = G.t + dur; }
+function drawBubbles(){ const W = innerWidth, Hh = innerHeight, edgeY = { '-1': [], '1': [] };
+  for (const b of bubbles){ if (G.t > b.until || G.dlg || G.beat === 'lit' || G.veiled || !b.n.g.visible){ b.el.style.opacity = 0; continue; }
+    const p = new V3(b.n.pos.x, b.n.top + .3 + b.n.y + (b.n.g.position.y - b.n.y), b.n.pos.y).project(camera); let x = (p.x*.5 + .5)*W, y = (-p.y*.5 + .5)*Hh, edge = 0;
+    if (p.z > 1){ x = W - x; y = Hh*.62; edge = x < W/2 ? -1 : 1; }
+    if (x < 130){ x = 130; edge = -1; } if (x > W - 130){ x = W - 130; edge = 1; } if (y < 110) y = 110; if (y > Hh - 40) y = Hh - 40;
+    if (edge){ x = edge < 0 ? 14 : W - 14; const used = edgeY[edge]; for (let k = 0; k < 6 && used.some(u => Math.abs(u - y) < 56); k++) y += 58; used.push(y); }
+    b.el.className = 'bub' + (edge < 0 ? ' el' : edge > 0 ? ' er' : '');
+    b.el.style.transform = edge < 0 ? 'translate(0,-50%)' : edge > 0 ? 'translate(-100%,-50%)' : 'translate(-50%,-100%)';
+    b.el.style.left = x + 'px'; b.el.style.top = (edge ? y - 20 : y - 8) + 'px'; b.el.style.opacity = 1; } }
+// a written sign over the city gate, in the HUD layer
+const LABELS = [{ html: 'अयोध्या<small>Ayodhya</small>', p: new V3(0, 5.9, GATE_Z + 1), max: 30 }];
+LABELS.forEach(L => { L.el = document.createElement('div'); L.el.className = 'label'; L.el.innerHTML = L.html; $('hud').appendChild(L.el); });
+function drawLabels(){ for (const L of LABELS){ const d = camera.position.distanceTo(L.p), p = L.p.clone().project(camera), on = !G.today && !G.veiled && G.beat !== 'lit' && p.z < 1 && d < L.max && d > 4 && Math.abs(p.x) < 1.1 && Math.abs(p.y) < 1.1;
+  L.el.style.opacity = on ? 1 : 0; if (on){ L.el.style.left = (p.x*.5 + .5)*innerWidth + 'px'; L.el.style.top = (-p.y*.5 + .5)*innerHeight + 'px'; } } }
+const dlgEl = $('dlg');
+function dialog(n, lines, done){ G.dlg = { n, cur: n, lines, i: 0, done }; dlgEl.style.display = 'block'; showLine(); progress(); }
+function showLine(){ const [who, text] = G.dlg.lines[G.dlg.i], you = who === 'you';
+  G.dlg.cur = you ? G.dlg.n : (SPEAKER[who] || G.dlg.n);
+  $('dlgWho').textContent = you ? 'Rama (you)' : who; $('dlgWho').className = 'who' + (you ? ' you' : ''); $('dlgLine').textContent = text; }
+function advance(){ if (!G.dlg) return; G.dlg.i++; if (G.dlg.i >= G.dlg.lines.length){ const f = G.dlg.done; G.dlg = null; dlgEl.style.display = 'none'; if (f) f(); } else showLine(); }
+
+/* ---------------- the story, beat by beat ---------------- */
+const Y = 'you';
+function setGlow(list){ for (const g of G.glowing) setHL(g, false); G.glowing = list; for (const g of list) setHL(g, true); }
+const npcAt = n => new V3(n.pos.x, n.y + 1.2*n.s, n.pos.y);
+const pv3 = () => new V3(player.pos.x, 0, player.pos.y);
+function setBeat(b){ G.beat = b; G.beatT = 0; G.step = 0; G.later = []; }
+function startArrive(){ setBeat('arrive'); G.arriveT = 0; objective('Home to Ayodhya, on the Pushpaka Vimana', null); }
+function landed(){ G.vimLanded = true; setBeat('landed'); sfx.whoosh();
+  for (let i = 0; i < 22; i++){ const a = i/22*TAU; emit(new V3(VIM_END.x + 3.3*Math.cos(a), .2, VIM_END.z + 4.5*Math.sin(a)), new V3(Math.cos(a)*1.6, 1, Math.sin(a)*1.6), .2, 1); }
+  dialog(NPC.sita, [
+    ['Sita', 'Ayodhya, at last. But the road is so dark tonight.'],
+    ['Lakshmana', 'It is Amavasya, brother. The night with no moon.'],
+    ['Hanuman', 'Bharata waits at Nandigram. I flew ahead to tell him you were coming.'],
+    [Y, 'Then let us go to him.'],
+  ], startBharata); }
+function startBharata(){ setBeat('bharata'); COMP.forEach(n => n.mode = 'follow');
+  objective('Walk to Bharata at Nandigram', () => npcAt(NPC.bharata), ['Bharata is the one holding a lamp, by the little throne at Nandigram, just ahead.', 'Walk up to Bharata with WASD and press E.']);
+  setGlow([NPC.bharata.g]); say(NPC.bharata, 'Brother! Is it you?', 4); }
+function talkBharata(){ dialog(NPC.bharata, [
+  ['Bharata', 'Brother! You are home!'],
+  ['Bharata', 'For fourteen years your padukas sat on the throne. I only kept the kingdom for you.'],
+  [Y, 'Bharata, my brother. No one could have kept it better.'],
+  ['Bharata', 'Then wear them, and walk home. Ayodhya is waiting.'],
+], () => { setBeat('padukas'); G.padT = 0; setGlow([]); G.padFrom = padG.position.clone();
+  const fw = new V2(-Math.sin(player.yaw), -Math.cos(player.yaw)); G.padTo = new V3(player.pos.x + fw.x*.85, groundAt(player.pos.x, player.pos.y) + .005, player.pos.y + fw.y*.85);
+  objective('Bharata places your padukas before you', null); NPC.bharata.pose = 'namaste'; }); }
+function wearPadukas(){ G.padWorn = true; padG.visible = false; H.feet.forEach(f => f.userData.pad.visible = true); sfx.clack(); setTimeout(() => sfx.clack(), 160); sfx.bell(660);
+  setGlow([]); progress(); startWalk(); say(NPC.bharata, 'Light the lamps! Rama is home!', 4.5); }
+function startWalk(){ setBeat('walk'); G.lampsOn = true; NPC.bharata.pose = 'hold'; COMP.forEach(n => n.mode = 'follow');
+  objective('Walk home to Ayodhya', () => new V3(0, 1.4, Math.max(STEP_Z + 1, Math.min(player.pos.y - 14, GATE_Z - 4))),
+    ['Follow the road north, through the city gate, to the palace at the end of the lane.', 'Hold W to walk. The lamps light up ahead of you.']);
+  fireRow(ROWS.find(r => r.lamps === nandiLamps), G.t + .3);
+  G.later = [[2.6, () => say(NPC.nelder, 'Siyavar Ramchandra ki jai!', 3.5)], [3.4, () => say(NPC.nwoman, 'Welcome home!', 3)]]; }
+function startMothers(){ setBeat('mothers');
+  objective('Greet your mothers at the palace steps', () => nearestMother(), ['Kaushalya, Kaikeyi and Sumitra wait at the foot of the palace steps.', 'Walk up to each mother and press E.']);
+  setGlow(MOTHERS.filter(k => !G.talked[k]).map(k => NPC[k].g)); say(NPC.kaushalya, 'Rama!', 3); }
+const nearestMother = () => { const c = MOTHERS.filter(k => !G.talked[k]).map(k => NPC[k]); c.sort((a, b) => a.pos.distanceTo(player.pos) - b.pos.distanceTo(player.pos)); return c[0] ? npcAt(c[0]) : null; };
+const MLINES = {
+  kaushalya: [['Kaushalya', 'Rama, my child. Every evening for fourteen years, I lit one lamp for you. Tonight all of Ayodhya lit one with me.'], [Y, 'I am home, Ma.']],
+  kaikeyi: [['Kaikeyi', 'My Rama. Fourteen years ago my words sent you away. Tonight let my lamp be the first to call you home.'], [Y, 'Ma, you are my mother too. I bow to you, as I always have.']],
+  sumitra: [['Sumitra', 'You brought my Lakshmana home safe, and he never left your side. Welcome home, both my sons.']],
+};
+function greetMother(k){ G.bowT = 1.3; dialog(NPC[k], MLINES[k], () => { G.talked[k] = true; setHL(NPC[k].g, false); G.glowing = G.glowing.filter(g => g !== NPC[k].g); NPC[k].pose = 'bless';
+  const n = MOTHERS.filter(m => G.talked[m]).length; if (n < 3){ objective(`Greet your mothers at the palace steps (${n} of 3)`, () => nearestMother(), G.hints); return; }
+  startLit(); }); }
+function startLit(){ setBeat('lit'); setGlow([]); objective('', null); G.camFrom = { p: camera.position.clone(), yaw: player.yaw, pitch: player.pitch };
+  for (const r of ROWS) if (!r.done && !r.manual) fireRow(r, G.t + Math.random()*1.5);
+  for (const v of VILL) if (!v.npc.out) comeOut(v.npc);
+  later(1.5, () => caption('Ayodhya, lit for Rama<small>On Amavasya, the darkest night of the month, the whole city shone.</small>'));
+  later(8, () => caption('Siyavar Ramchandra ki jai!<small>The people of Ayodhya</small>')); }
+function later(sec, f){ (G.later = G.later || []).push([G.beatT + sec, f]); }
+function startShift(){ setBeat('shift'); caption(''); G.veiled = true; $('veilT').textContent = 'Today, on Diwali night, homes everywhere light lamps the same way.'; $('veil').classList.remove('off'); }
+function setupToday(){ G.today = true; today.visible = true;
+  NPCS.forEach(n => { if (n.d.today){ n.g.visible = true; n.mode = 'idle'; } else { n.g.visible = false; n.mode = 'hidden'; } });
+  vim.visible = false; padG.visible = false;
+  for (const L of LAMPS){ if (!L.lit){ L.lit = true; L.t = G.t - 1; } setTS(lampPool.instanceMatrix.array, L.i, L.x, L.py + .02, L.z, L.pr, 1, L.pr); } lampPool.instanceMatrix.needsUpdate = true; litCount = LAMPS.length; for (const r of ROWS) r.done = true; QUEUE.length = 0;
+  player.pos.set(4.4, CHZ + .6); player.yaw = -PI/2 - .15; player.pitch = -.12; player.y = 0; G.holding = null; }
+function startRangoli(){ setBeat('rangoli'); bubbles.forEach(b => b.until = 0); G.veiled = false; $('veil').classList.add('off');
+  objective('Riya is finishing a rangoli at her doorstep', () => npcAt(NPC.riya), ['Riya is the girl kneeling by the flower pattern on the ground, in front of the white house.', 'Walk up to Riya and press E.']);
+  setGlow([NPC.riya.g]); later(1.2, () => say(NPC.riya, 'Happy Diwali! Come and see!', 4)); }
+function talkRiya(){ dialog(NPC.riya, [['Riya', 'Happy Diwali! My rangoli is almost done.'], ['Riya', 'Will you fill the last petals? Take a colour from a bowl, then fill an empty petal. Any colours you like!']], () => {
+  G.step = 1; setGlow(BOWLS.map(b => b.g)); objective('Fill the empty petals of the rangoli, any colours', () => rangoliTarget(), ['Look down at the little bowls of colour and press E to take some. Then look at a white petal and press E.', 'Take a colour (E on a bowl), then aim the dot at an empty white petal and press E.']); }); }
+const rangoliTarget = () => { if (!G.colour) return BOWLS[2].g.position.clone().setY(.12); const p = PETALS.find(q => !q.done); return p ? p.pos.clone() : null; };
+function pickColour(b){ G.colour = b.P; G.holding = 'pinch'; sfx.tick(3); progress(); setGlow(PETALS.filter(p => !p.done).map(p => p.m));
+  for (let i = 0; i < 4; i++) emit(b.g.position.clone().setY(.15), new V3((Math.random() - .5)*.4, 1, (Math.random() - .5)*.4), .03, .6, b.P); }
+function fillPetal(p){ p.done = true; p.m.material = toon(G.colour, 1); G.filled++; sfx.tick(G.filled*2); progress();
+  for (let i = 0; i < 7; i++) emit(p.pos.clone().setY(.06), new V3((Math.random() - .5)*.8, .7 + Math.random()*.5, (Math.random() - .5)*.8), .025, .7, G.colour);
+  setHL(p.m, false); G.glowing = G.glowing.filter(g => g !== p.m);
+  if (G.filled >= PETALS_EMPTY){ G.colour = null; G.holding = null; setGlow([]); say(NPC.riya, 'It is the prettiest rangoli on our street!', 4); NPC.riya.target = new V2(10.1, CHZ - 4.3); NPC.riya.mode = 'walk'; NPC.riya.speed = 1.4; sfx.bell(990); G.step = 2; later(2.4, startDiyas); } }
+function startDiyas(){ setBeat('diyas'); bubbles.forEach(b => b.until = 0); objective('Riya\'s mother has a lamp for you', () => npcAt(NPC.mother), ['Riya\'s mother stands by the low wall, holding a plate with a lamp.', 'Walk up to her and press E.']);
+  setGlow([NPC.mother.g]); say(NPC.mother, 'Come, help me light our wall!', 4); }
+function talkMother(){ dialog(NPC.mother, [['Riya\'s mother', 'Shubh Deepavali! Will you light the diyas on our wall?'], ['Riya\'s mother', 'Take this lamp. Light the first one, and the flame will pass along.']], () => {
+  G.step = 1; G.holding = 'diya'; setGlow([WALLD[0].d]); objective('Light the first diya on the wall', () => WALLD[0].d.position.clone().setY(1.05), ['The first clay lamp sits at the near end of the low wall.', 'Aim the dot at the first diya on the wall and press E.']); }); }
+function lightWall(){ G.step = 2; setGlow([]); progress(); WALLD.forEach((w, i) => w.at = G.t + i*.06); G.wallRun = true; }
+function startPuja(){ setBeat('puja'); bubbles.forEach(b => b.until = 0); G.holding = null;
+  objective('Join the family\'s Lakshmi puja', () => pujaTarget(), ['Ring the bell, wave the lamp and offer a flower, in any order. There is no hurry.', 'Stand by the low table on the verandah. Aim at the bell, the lamp plate or the flowers and press E.']);
+  setGlow([PUJA.bell, PUJA.lamp, PUJA.basket]); say(NPC.nani, 'Come, child, join our Lakshmi puja. There is no hurry.', 5); }
+const PUJA_ITEMS = () => [['bell', PUJA.bell, 'Ring the bell', ringBell], ['aarti', PUJA.lamp, 'Wave the lamp', waveLamp], ['flower', PUJA.basket, 'Offer a flower', offerFlower]];
+const wpos = o => o.getWorldPosition(new V3());
+const pujaTarget = () => { const it = PUJA_ITEMS().find(([k]) => !G.puja[k]); return it ? wpos(it[1]).add(new V3(0, .05, 0)) : null; };
+function pujaDone(k, obj){ G.puja[k] = true; setHL(obj, false); G.glowing = G.glowing.filter(g => g !== obj); progress();
+  if (['bell', 'aarti', 'flower'].every(x => G.puja[x])) later(1.2, () => { say(NPC.nani, 'May Lakshmi bless every home with light.', 4.5); later(3, startMithai); }); }
+function ringBell(){ G.puja.ringT = 1.4; sfx.bell(1046); setTimeout(() => sfx.bell(1046), 330); setTimeout(() => sfx.bell(1046), 660); pujaDone('bell', PUJA.bell); }
+function waveLamp(){ G.holding = 'aarti'; G.aartiT = .001; PUJA.lamp.visible = false; G.puja.aartiBusy = true; say(NPC.nani, 'Om Jai Lakshmi Mata...', 4); }
+function offerFlower(){ const f = PUJA.flowers.find(x => !x.visible); if (f) f.visible = true; sfx.tick(5); pujaDone('flower', PUJA.basket); say(NPC.father, 'A marigold for Lakshmi.', 3); }
+function startMithai(){ setBeat('mithai'); bubbles.forEach(b => b.until = 0); objective('Kamala aunty is sharing mithai', () => npcAt(NPC.kamala), ['Kamala aunty, the neighbour with the plate of sweets, is in the square.', 'Walk up to Kamala aunty and press E.']);
+  setGlow([NPC.kamala.g]); say(NPC.kamala, 'Mithai! Who wants mithai?', 4); }
+function talkKamala(){ dialog(NPC.kamala, [['Kamala aunty', 'Shubh Deepavali! Laddoo, barfi, kaju katli... take one. Take two!'], [Y, 'Thank you, aunty. Shubh Deepavali!']], () => {
+  G.holding = 'sweet'; setGlow([]); setBeat('finale'); objective('Shubh Deepavali', null); G.fireAt = [.8, 1.9, 3.1]; }); }
+function showWhy(){ G.ended = true; $('why').hidden = false; if (locked) document.exitPointerLock(); }
+
+/* ---------------- lamps lighting ---------------- */
+function fireRow(r, at = G.t){ if (!r || r.done) return; r.done = true; r.lamps.forEach((L, k) => QUEUE.push({ t: at + r.delay + k*r.gap, L, n: r.note + k }));
+  if (r.who && r.who.npc) comeOut(r.who.npc, at + r.delay*.5); }
+function comeOut(n, at = G.t){ if (n.out) return; n.out = true; n.g.visible = !G.today; n.mode = 'walk'; n.pos.copy(n.d.door); n.target = n.d.out.clone(); n.speed = 1.5; n.y = .45; n.pose = 'hold'; }
+function lightLamp(L, note){ if (L.lit) return; L.lit = true; L.t = G.t; litCount++; sfx.tick(note); }
+function rowsStep(){ if (!G.lampsOn || G.today) return; const pz = player.pos.y;
+  for (const r of ROWS){ if (r.done || r.manual) continue; if (pz < r.trig + r.ahead) fireRow(r); }
+  for (let i = QUEUE.length - 1; i >= 0; i--) if (QUEUE[i].t <= G.t){ lightLamp(QUEUE[i].L, QUEUE[i].n); QUEUE.splice(i, 1); }
+  // the warm lamp-lit ambient follows the lit part of the road
+  let lo = 999, hi = -999; for (const L of LAMPS) if (L.lit && Math.abs(L.x) < 16 && G.t - L.t > .1){ if (L.z < lo) lo = L.z; if (L.z > hi) hi = L.z; }
+  if (lo < 999){ G.warm.x = lerp(G.warm.x > 900 ? lo + 6 : G.warm.x, lo, .08); G.warm.y = Math.max(hi + 3, 0); G.warm.z = 16; G.warm.w = clamp(G.warm.w + .02, 0, .55); } }
+function lampsStep(){ const cam = camera.position, A = lampFlame.instanceMatrix.array, B = lampCore.instanceMatrix.array, P = lampPool.instanceMatrix.array; let pd = false;
+  for (const L of LAMPS){ if (!L.lit) continue; const i = L.i, age = G.t - L.t, pop = age < .22 ? outBack(age/.22) : 1;
+    const dx = cam.x - L.x, dy = cam.y - L.y, dz = cam.z - L.z, dist = Math.sqrt(dx*dx + dy*dy + dz*dz), ds = dist > 13 ? Math.pow(dist/13, .72) : 1;
+    const f = 1 + .14*Math.sin(G.t*11 + i*1.7) + .06*Math.sin(G.t*23 + i), s = L.k*pop*ds, hd = Math.hypot(dx, dz) || 1;
+    setTS(A, i, L.x + .05*L.k, L.y + .08*L.k, L.z, s, s*f, s);
+    setTS(B, i, L.x + .05*L.k + dx/hd*.03*s, L.y + .09*L.k, L.z + dz/hd*.03*s, s, s*f*.95, s);
+    if (age < .5){ const pp = Math.max(.001, L.pr*sm(clamp(age/.4))); setTS(P, i, L.x, L.py + .02, L.z, pp, 1, pp); pd = true; } }
+  lampFlame.instanceMatrix.needsUpdate = lampCore.instanceMatrix.needsUpdate = true; if (pd) lampPool.instanceMatrix.needsUpdate = true;
+  // the family's wall row and every hand-held lamp
+  for (const w of WALLD){ if (!w.lit && w.at !== undefined && G.t >= w.at){ w.lit = true; w.t = G.t; w.d.userData.flame.forEach(f => f.visible = true); G.wallLit++; sfx.tick(G.wallLit); }
+    if (w.lit){ const age = G.t - w.t; w.p.scale.setScalar(Math.max(.001, .7*sm(clamp(age/.4)))); } }
+  FLAMES.forEach((d, i) => { if (!d.visible) return; const f = 1 + .14*Math.sin(G.t*11 + i*1.7) + .06*Math.sin(G.t*23 + i); d.userData.flame.forEach(m => m.scale.set(1, f, 1)); }); }
+
+/* ---------------- interaction targets ---------------- */
+function targets(){ const T = [], add = (obj, pos, label, use, o = {}) => T.push({ obj, pos, label, use, ...o });
+  const nt = (n, label, use) => add(n.g, npcAt(n), label, use);
+  const B = G.beat;
+  if (B === 'bharata') nt(NPC.bharata, 'Talk to Bharata', talkBharata);
+  if (B === 'padukas' && G.padT > 1.5) add(padG, padG.position.clone(), 'Wear your padukas', wearPadukas, { small: true, r: .45, reach: 2.6 });
+  if (B === 'mothers') for (const k of MOTHERS) if (!G.talked[k]) nt(NPC[k], 'Greet ' + NPC[k].d.name, () => greetMother(k));
+  if (B === 'rangoli'){ if (G.step === 0) nt(NPC.riya, 'Talk to Riya', talkRiya);
+    if (G.step === 1){ for (const b of BOWLS) add(b.g, b.g.position.clone().setY(.1), 'Take ' + colourName(b.P), () => pickColour(b), { small: true, r: .2, reach: 3.5 });
+      if (G.colour) for (const p of PETALS) if (!p.done) add(p.m, p.pos, 'Fill the petal with ' + colourName(G.colour), () => fillPetal(p), { small: true, r: .22, reach: 3.2 }); } }
+  if (B === 'diyas'){ if (G.step === 0) nt(NPC.mother, 'Talk to Riya\'s mother', talkMother);
+    if (G.step === 1) add(WALLD[0].d, WALLD[0].d.position.clone().setY(1.06), 'Light the first diya', lightWall, { small: true, r: .3, reach: 3 }); }
+  if (B === 'puja' && !G.puja.aartiBusy) for (const [k, o, label, f] of PUJA_ITEMS()) if (!G.puja[k]) add(o, wpos(o).add(new V3(0, .05, 0)), label, f, { small: true, r: .2, reach: 3.2 });
+  if (B === 'mithai') nt(NPC.kamala, 'Take some mithai', talkKamala);
+  return T; }
+const colourName = P => ({ [TOMATO.l]: 'red', [MARIGOLD.l]: 'marigold yellow', [TEAL.l]: 'green', [BLUSH.l]: 'pink', [WHITE.l]: 'rice white' })[P.l] || 'colour';
+function focusTarget(){ let best = null, bs = 1e9; const fw = new V2(-Math.sin(player.yaw), -Math.cos(player.yaw));
+  const eye = camera.position, look = new V3(0, 0, -1).applyQuaternion(camera.quaternion);
+  for (const t of targets()){ const d = new V2(t.pos.x - player.pos.x, t.pos.z - player.pos.y), dist = d.length();
+    if (t.small){ if (dist > (t.reach || 3)) continue; const v = t.pos.clone().sub(eye), along = v.dot(look); if (along <= .1) continue;
+      const perp = Math.sqrt(Math.max(0, v.lengthSq() - along*along)), lim = t.r + .03*along; if (perp > lim) continue; const s = perp/lim; if (s < bs){ bs = s; best = t; } continue; }
+    if (dist > 3.6) continue; const dot = dist > .01 ? d.normalize().dot(fw) : 1; if (dist > 1.6 && dot < .72) continue; const s = 2 + dist - dot*1.5; if (s < bs){ bs = s; best = t; } }
+  return best; }
+
+/* ---------------- input ---------------- */
+let locked = false, dragging = false, lastX = 0, lastY = 0, lockWanted = false;
+const canLock = 'pointerLockElement' in document && window.top === window;
+document.addEventListener('pointerlockchange', () => { locked = document.pointerLockElement === canvas; if (!locked && G.started && !G.ended && !G.selftest && lockWanted) pauseGame(true); });
+function grab(){ if (!canLock) return; lockWanted = true; try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (e) {} }
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+canvas.addEventListener('mousedown', e => { sfx.init(); if (!G.started || G.paused) return;
+  if (G.dlg && e.button === 0){ advance(); return; }
+  if (canLock && !locked){ grab(); }
+  if (e.button === 0 && !locked){ dragging = true; lastX = e.clientX; lastY = e.clientY; } });
+addEventListener('mouseup', e => { if (e.button === 0) dragging = false; });
+addEventListener('mousemove', e => { if (locked){ inp.mdx += e.movementX; inp.mdy += e.movementY; }
+  else if (dragging){ inp.mdx += (e.clientX - lastX)*1.2; inp.mdy += (e.clientY - lastY)*1.2; lastX = e.clientX; lastY = e.clientY; } });
+canvas.addEventListener('touchstart', e => { const t = e.touches[0]; dragging = true; lastX = t.clientX; lastY = t.clientY; }, { passive: true });
+canvas.addEventListener('touchmove', e => { const t = e.touches[0]; inp.mdx += (t.clientX - lastX)*1.4; inp.mdy += (t.clientY - lastY)*1.4; lastX = t.clientX; lastY = t.clientY; }, { passive: true });
+canvas.addEventListener('touchend', () => { dragging = false; });
+const KEYS = { KeyW: 'f', ArrowUp: 'f', KeyS: 'b', ArrowDown: 'b', KeyA: 'l', ArrowLeft: 'l', KeyD: 'r', ArrowRight: 'r' };
+addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; sfx.init();
+  if (e.code === 'Escape' || e.code === 'KeyP'){ if (G.started && !G.ended) pauseGame(!G.paused); return; }
+  if (!G.started || G.paused) return;
+  if (KEYS[e.code]){ inp[KEYS[e.code]] = 1; e.preventDefault(); }
+  if (e.code === 'KeyE' || e.code === 'Enter'){ if (G.dlg) advance(); else { const t = focusTarget(); if (t) t.use(); } }
+  if (e.code === 'Space'){ e.preventDefault(); if (G.dlg) advance(); } });
+addEventListener('keyup', e => { if (KEYS[e.code]) inp[KEYS[e.code]] = 0; });
+addEventListener('blur', () => { inp.f = inp.b = inp.l = inp.r = 0; dragging = false; });
+function pauseGame(on){ G.paused = on; $('pause').hidden = !on; if (on){ inp.f = inp.b = inp.l = inp.r = 0; if (locked) document.exitPointerLock(); } else grab(); }
+function leave(url, line){ $('veilT').textContent = line; $('veil').classList.remove('off'); setTimeout(() => { location.href = url; }, 650); }
+$('resume').onclick = () => pauseGame(false);
+$('restart').onclick = () => { location.hash = G.from ? 'from=' + G.from : ''; location.reload(); };
+$('again').onclick = () => { location.hash = G.from ? 'from=' + G.from : ''; location.reload(); };
+$('back').onclick = () => leave('../index.html#done=diwali-ayodhya', 'Back to the islands');
+$('begin').onclick = () => { $('title').hidden = true; G.started = true; sfx.init(); startArrive(); grab(); };
+$('sWob').oninput = e => SET.wob = +e.target.value; $('sGrain').oninput = e => SET.grain = +e.target.value;
+$('sSens').oninput = e => SET.sens = +e.target.value; $('sVol').oninput = e => { SET.vol = +e.target.value; sfx.vol(SET.vol); };
+
+/* ---------------- simulation ---------------- */
+function camAuto(){ return G.dlg || ['lit', 'shift'].includes(G.beat) || G.aartiT > 0; }
+let lastDist = 1e9;
+function update(dt){
+  G.t += dt; G.beatT += dt;
+  const md = { x: inp.mdx*SET.sens, y: inp.mdy*SET.sens }; inp.mdx = inp.mdy = 0;
+  if (G.paused || !G.started) return;
+  if (!camAuto()){ player.yaw -= md.x*.0023; player.pitch = clamp(player.pitch - md.y*.0023, -1.3, 1.2); }
+  const canWalk = !G.dlg && !['arrive', 'landed', 'lit', 'shift', 'title'].includes(G.beat) && !(G.beat === 'padukas' && G.padT < 1.5) && G.aartiT <= 0;
+  const mv = new V2((inp.r - inp.l), (inp.b - inp.f)); let moving = false; const ox = player.pos.x, oz = player.pos.y;
+  if (canWalk && mv.lengthSq() > 0){ mv.normalize().multiplyScalar(4.3*dt); const c = Math.cos(player.yaw), s = Math.sin(player.yaw);
+    player.pos.x += mv.x*c + mv.y*s; player.pos.y += -mv.x*s + mv.y*c; moving = true; progressIfCloser(); }
+  if (G.beat !== 'arrive'){ collide(player.pos, .35, true); slide(player.pos, ox, oz); }
+  if (G.beat !== 'arrive') player.y = lerp(player.y, groundAt(player.pos.x, player.pos.y), 1 - Math.exp(-dt*12));
+  player.vel = lerp(player.vel, moving ? 1 : 0, 1 - Math.exp(-dt*10)); const ob = player.bob; player.bob += dt*player.vel*8.4;
+  if (G.padWorn && Math.floor(player.bob/PI) !== Math.floor(ob/PI) && player.vel > .3) sfx.clack();
+  beats(dt); npcs(dt); rowsStep(); world_(dt); particles(dt); hints(dt);
+  player.pose = G.aartiT > 0 ? 'aarti' : G.holding === 'pinch' ? 'pinch' : G.holding ? 'hold' : 'rest';
+  sfx.step(dt);
+}
+function progressIfCloser(){ if (!G.objTarget) return; const t = G.objTarget(); if (!t) return; const d = Math.hypot(t.x - player.pos.x, t.z - player.pos.y); if (d < lastDist - .6){ lastDist = d; G.stuck = Math.max(0, G.stuck - .5); } }
+function collide(p, r, isPlayer){
+  for (const [x0, z0, x1, z1] of BOXES){ if (p.x > x0 - r && p.x < x1 + r && p.y > z0 - r && p.y < z1 + r){
+    const dl = p.x - (x0 - r), dr = x1 + r - p.x, dn = p.y - (z0 - r), df = z1 + r - p.y, m = Math.min(dl, dr, dn, df);
+    if (m === dl) p.x = x0 - r; else if (m === dr) p.x = x1 + r; else if (m === dn) p.y = z0 - r; else p.y = z1 + r; } }
+  for (const [x, z, rr] of CIRCS){ const dx = p.x - x, dz = p.y - z, d = Math.hypot(dx, dz); if (d < rr + r && d > 1e-4){ p.x = x + dx/d*(rr + r); p.y = z + dz/d*(rr + r); } }
+}
+// you can't fall: the island (less a margin), the vimana's deck and the short step between them
+function walkable(x, z){ if (G.vimLanded && !G.today){ if (((x - VIM_END.x)/2.85)**2 + ((z - VIM_END.z)/4.0)**2 < 1) return true; if (Math.abs(x) < 1.6 && z > EDGE_S - 5 && z < VIM_END.z) return true; }
+  return islandRho(x, z) < 1 - 3/ISL.rz; }
+function slide(p, ox, oz){ if (walkable(p.x, p.y)) return; if (walkable(p.x, oz)) p.y = oz; else if (walkable(ox, p.y)) p.x = ox; else p.set(ox, oz); }
+function beats(dt){
+  const B = G.beat;
+  if (G.later){ const Lt = G.later; for (let i = Lt.length - 1; i >= 0; i--){ if (!Lt[i]) continue; const [t, f] = Lt[i]; if (G.beatT >= t){ Lt.splice(i, 1); f(); } } }
+  if (B === 'arrive'){ G.arriveT += dt; const u = clamp(G.arriveT/8.2), v = vimPose(u); vim.position.copy(v.p); vim.rotation.set(0, v.yaw, v.roll);
+    const p = vimLocal(0, .5); player.pos.copy(p); player.y = vim.position.y + DECK_Y; G.night = Math.max(G.night, lerp(.5, 1, sm(clamp(G.arriveT/7))));
+    if (u >= 1) landed(); }
+  if (B === 'padukas'){ G.padT += dt; const u = clamp(G.padT/1.4), e = ease(u);
+    padG.position.lerpVectors(G.padFrom, G.padTo, e); padG.position.y += Math.sin(u*PI)*.5; padG.rotation.y = lerp(0, player.yaw, e);
+    const b = NPC.bharata; b.g.rotation.x = Math.sin(u*PI)*.35;
+    if (G.padT > 1.5 && !G.padReady){ G.padReady = true; objective('Wear your padukas', () => padG.position.clone(), ['Look down at the wooden sandals in front of you and press E.', 'Aim the dot at the padukas on the ground and press E.']); setGlow([padG]); } }
+  if (B === 'walk' && player.pos.y < STEP_Z + 7.5) startMothers();
+  if (B === 'walk' && !G.gateSaid && player.pos.y < GATE_Z + 9){ G.gateSaid = true; say(NPC.guard1, 'Siyavar Ramchandra ki jai!', 3.5); later(.9, () => say(NPC.guard2, 'Open the gates! Rama is home!', 3.5));
+    later(3.5, () => say(NPC.sita, 'Look, Rama. They are lighting the way for us.', 4)); later(9, () => say(NPC.hanuman, 'Even the rooftops are lit!', 3.5)); later(15, () => say(NPC.lakshmana, 'Ayodhya never forgot you, brother.', 4)); }
+  if (['walk', 'mothers'].includes(B)) for (const v of VILL){ const n = v.npc; if (!n.out || n.said || !n.g.visible) continue; if (Math.abs(n.pos.y - player.pos.y) < 6 && n.pos.y < player.pos.y + 4){ n.said = true; say(n, v.line, 3.2); } }
+  if (B === 'lit' && G.beatT > 15) startShift();
+  if (B === 'shift'){ if (G.beatT > .7 && !G.today) setupToday(); if (G.beatT > 2.4) startRangoli(); }
+  if (B === 'diyas' && G.wallRun && G.wallLit >= WALLN && !G.wallSaid){ G.wallSaid = true; say(NPC.mother, 'See? One flame lights them all.', 4); G.holding = null; later(2.6, startPuja); }
+  if (G.aartiT > 0){ G.aartiT += dt; if (G.aartiT > 4.2){ G.aartiT = 0; G.holding = null; PUJA.lamp.visible = true; G.puja.aartiBusy = false; pujaDone('aarti', PUJA.lamp); } }
+  if (G.puja.ringT > 0){ G.puja.ringT -= dt; PUJA.bell.rotation.z = Math.sin(G.puja.ringT*22)*.35*G.puja.ringT; }
+  if (B === 'finale'){ for (let i = 0; i < 3; i++) if (G.fireAt && G.beatT > G.fireAt[i] && BURSTS[i].userData.t > 50) burst(i);
+    if (G.beatT > 6.5 && !G.ended) showWhy(); }
+  for (const b of BURSTS) if (b.visible){ b.userData.t += dt; const t = b.userData.t, s = t < .45 ? 7*outBack(t/.45) : t < .9 ? 7 : 7*(1 - sm(clamp((t - .9)/.5)));
+    b.scale.setScalar(Math.max(.001, s)); b.position.y -= dt*.8; if (t > 1.4) b.visible = false; }
+  const t = G.dlg ? null : focusTarget(); prompt(t ? `${KEY('E')} ${t.label}` : '');
+}
+function burst(i){ const b = BURSTS[i]; b.userData.t = 0; b.visible = true; b.position.set(RC.x - 8 + i*7, 20 + i*3, CHZ - 20 - i*4); b.lookAt(camera.position); sfx.pop(); }
+// villagers, companions and families
+function npcs(dt){
+  for (const n of NPCS){
+    if (n.mode === 'hidden'){ continue; }
+    if (n.mode === 'ride'){ const p = vimLocal(...n.d.ride); n.pos.copy(p); n.y = vim.position.y + DECK_Y; n.h = vim.rotation.y + PI; }
+    if (n.mode === 'follow'){ const off = { sita: [-1.3, 2.0], lakshmana: [1.3, 2.1], hanuman: [0, 3.5] }[n.d.id], c = Math.cos(player.yaw), s = Math.sin(player.yaw);
+      const tgt = new V2(player.pos.x + off[0]*c + off[1]*s, player.pos.y - off[0]*s + off[1]*c), d = tgt.distanceTo(n.pos);
+      if (G.beat === 'mothers' || G.beat === 'lit'){ const k = COMP.indexOf(n); tgt.set(-2.2 + k*2.2, MOTHER_Z + 4.4); }
+      if (d > .35){ n.target = tgt; n.speed = Math.min(5.4, .8 + d*1.6); } else { n.target = null; n.h += angDiff(n.h, player.yaw + PI)*Math.min(1, dt*3); } }
+    if (n.target){ const dx = n.target.x - n.pos.x, dz = n.target.y - n.pos.y, d = Math.hypot(dx, dz);
+      if (d > .1){ const st = Math.min(d, n.speed*dt); n.pos.x += dx/d*st; n.pos.y += dz/d*st; if (d > .3) n.h += angDiff(n.h, Math.atan2(dx, dz))*Math.min(1, dt*8); n.walkT += dt*n.speed*3.2; }
+      else { n.target = null; if (n.mode === 'walk') n.mode = 'idle'; } }
+    else if (n.mode === 'idle'){ const look = G.dlg && G.dlg.cur === n ? player.pos : n.d.villager ? new V2(0, n.pos.y + 2) : null;
+      if (look) n.h += angDiff(n.h, Math.atan2(look.x - n.pos.x, look.y - n.pos.y))*Math.min(1, dt*3);
+      else if (!n.d.today && n.pos.distanceTo(player.pos) < 6 && n.mode !== 'ride') n.h += angDiff(n.h, Math.atan2(player.pos.x - n.pos.x, player.pos.y - n.pos.y))*Math.min(1, dt*2); }
+    if (n.mode === 'follow' || n.mode === 'walk'){ for (const m of NPCS){ if (m === n || m.mode === 'hidden' || !m.g.visible) continue; const dx = n.pos.x - m.pos.x, dz = n.pos.y - m.pos.y, d = Math.hypot(dx, dz);
+      if (d < .65 && d > 1e-4){ n.pos.x += dx/d*(.65 - d)*.5; n.pos.y += dz/d*(.65 - d)*.5; } }
+      const dx = n.pos.x - player.pos.x, dz = n.pos.y - player.pos.y, d = Math.hypot(dx, dz); if (d < .8 && d > 1e-4){ n.pos.x += dx/d*(.8 - d)*.5; n.pos.y += dz/d*(.8 - d)*.5; }
+      if (n.mode === 'follow') { collide(n.pos, .3, false); if (!walkable(n.pos.x, n.pos.y)) n.pos.lerp(player.pos, .2); n.y = lerp(n.y, groundAt(n.pos.x, n.pos.y), 1 - Math.exp(-dt*10)); } }
+    if (n.arms){ const k = Math.min(1, dt*6); let pose = n.pose;
+      for (const side of [1, -1]){ let dir;
+        if (pose === 'hold') dir = new V3(-side*.42, -.55, .75);
+        else if (pose === 'namaste') dir = new V3(-side*.62, -.25, .85);
+        else if (pose === 'bless') dir = side > 0 ? new V3(.25, .35, .9) : new V3(-.16, -1, .05);
+        else if (pose === 'wave') dir = side > 0 ? new V3(.6, 1, .2 + .45*Math.sin(G.t*10)) : new V3(-.18, -1, .05);
+        else if (pose === 'point' && n.pointAt && side > 0){ const w = new V3(n.pointAt.x - n.pos.x, .35, n.pointAt.z - n.pos.y).normalize(); const c = Math.cos(-n.h), s = Math.sin(-n.h); dir = new V3(w.x*c + w.z*s, w.y, -w.x*s + w.z*c); }
+        else dir = new V3(side*.16, -1, .05 + (n.target ? .3*Math.sin(n.walkT + (side > 0 ? 0 : PI)) : 0));
+        _q.setFromUnitVectors(DOWN, dir.normalize()); n.arms[side].quaternion.slerp(_q, k); }
+      if (pose === 'point' && G.t > n.pointUntil) n.pose = n.d.thali ? 'hold' : 'down'; }
+    const bob = n.target ? Math.abs(Math.sin(n.walkT))*.06 : 0;
+    n.g.position.set(n.pos.x, n.y + bob, n.pos.y); n.g.rotation.y = n.h;
+  }
+}
+function pointAndCall(text){ const t = G.objTarget && G.objTarget(); if (!t) return; let best = null, bd = 1e9;
+  for (const n of NPCS){ if (!n.g.visible || n.mode === 'hidden' || n.mode === 'ride') continue; const d = n.pos.distanceTo(player.pos); if (d < bd && d < 30){ bd = d; best = n; } }
+  if (best){ best.pose = 'point'; best.pointAt = t; best.pointUntil = G.t + 4; say(best, text, 4); } }
+function hints(dt){
+  if (G.dlg || G.paused) return;
+  G.stuck += dt;
+  if (G.hints && G.hints.length){
+    const calls = { bharata: 'Brother! Over here, by the lamp!', walk: 'This way, Rama! The palace is straight ahead!', mothers: 'Rama! Your mothers are waiting!', rangoli: 'Over here! Help me finish!',
+      diyas: 'The wall is here, beside me!', puja: 'Come, child, here by the little table.', mithai: 'Sweets! Over here!', padukas: 'Your padukas, brother, right in front of you.' };
+    if (G.stuck > 20 && G.hintShown < 1){ G.hintShown = 1; hintEl.textContent = G.hints[0]; hintEl.classList.add('show'); if (calls[G.beat]) pointAndCall(calls[G.beat]); }
+    if (G.stuck > 40 && G.hintShown < 2 && G.hints[1]){ G.hintShown = 2; hintEl.textContent = G.hints[1]; pointAndCall('This way!'); } }
+}
+function world_(dt){
+  // dusk: paper, to warm grey, to indigo paper
+  if (G.beat !== 'arrive' && G.beat !== 'title') G.night = Math.min(1, G.night + dt*.1);
+  const n = G.night, amb = n < .5 ? new V3(1, 1, 1).lerp(new V3(.84, .8, .76), n*2) : new V3(.84, .8, .76).lerp(new V3(.42, .47, .7), (n - .5)*2);
+  U.uAmb.value.copy(amb); document.body.classList.toggle('night', n > .55);
+  if (G.today){ G.warm.set(-80, 60, 30, .56); }
+  U.uWarm.value.copy(G.warm);
+  shadowMat.uniforms.uCol.value.copy(mixHex(SHADOW, '#262a45', clamp((n - .4)/.5)));
+  starMat.uniforms.uA.value = clamp((n - .7)/.3)*.9;
+  CLOUDS.rotation.y = G.t*.004;
+  lampsStep();
+}
+function particles(dt){ for (const m of parts){ if (!m.visible) continue; const u = m.userData; u.life -= dt; if (u.life <= 0){ m.visible = false; continue; }
+  u.v.y -= 6*dt; m.position.addScaledVector(u.v, dt); if (m.position.y < .04 && u.v.y < 0){ m.position.y = .04; u.v.multiplyScalar(.3); } } }
+
+/* ---------------- camera ---------------- */
+function cameraStep(dt){
+  const k = 1 - Math.exp(-dt*3.2);
+  if (G.dlg){ const n = G.dlg.cur; player.yaw += angDiff(player.yaw, Math.atan2(-(n.pos.x - player.pos.x), -(n.pos.y - player.pos.y)))*k;
+    player.pitch = lerp(player.pitch, Math.atan2(n.top*.85 + n.y - player.y - player.eye, Math.max(1, n.pos.distanceTo(player.pos))), k); }
+  if (G.aartiT > 0){ player.yaw += angDiff(player.yaw, Math.atan2(-(SHRINE.x - player.pos.x), -(SHRINE.z - player.pos.y)))*k; player.pitch = lerp(player.pitch, -.32, k); }
+  let bow = 0; if (G.bowT > 0){ G.bowT = Math.max(0, G.bowT - dt); bow = Math.sin((1 - G.bowT/1.3)*PI)*.55; }
+  const sh = G.shake; G.shake *= Math.exp(-dt*3);
+  camera.position.set(player.pos.x + (Math.random() - .5)*sh, player.y + player.eye + Math.sin(player.bob)*.03*player.vel, player.pos.y);
+  camera.rotation.set(player.pitch - bow, player.yaw, 0);
+  if (G.beat === 'lit'){ // a slow crane up and away to see the whole island lit
+    const u = ease(clamp(G.beatT/13.5)), P = [G.camFrom.p, new V3(9, 9, -26), new V3(48, 30, 14), new V3(92, 24, 84)], c = new THREE.CatmullRomCurve3(P).getPoint(u);
+    const look = new V3(0, 3, -58).lerp(new V3(0, -9, -6), clamp(u*1.4)); camera.position.copy(c);
+    const d = look.sub(c), yaw = Math.atan2(-d.x, -d.z), pitch = Math.atan2(d.y, Math.hypot(d.x, d.z));
+    const w = clamp(G.beatT/1.2); camera.rotation.set(lerp(G.camFrom.pitch, pitch, w), G.camFrom.yaw + angDiff(G.camFrom.yaw, yaw)*w, 0); }
+  camera.fov = lerp(camera.fov, G.beat === 'lit' ? 64 : 72, k*.5); camera.updateProjectionMatrix();
+  const yawL = camera.rotation.y, c = Math.cos(yawL), s = Math.sin(yawL), right = new V3(c, 0, -s), back = new V3(s, 0, c);
+  U.uLight.value.set(0, 0, 0).addScaledVector(right, .55).addScaledVector(UP, 1).addScaledVector(back, .3).normalize();
+  const showMe = G.beat !== 'lit' && G.beat !== 'shift';
+  vm.visible = bodyF.visible = feetF.visible = showMe;
+  vm.position.copy(camera.position); vm.rotation.set((player.pitch - bow)*.7, player.yaw, 0, 'YXZ');
+  bodyF.position.copy(camera.position); bodyF.rotation.set(0, player.yaw, 0);
+  feetF.position.set(player.pos.x, player.y, player.pos.y); feetF.rotation.set(0, player.yaw, 0);
+  H.feet.forEach(f => { const s2 = f.userData.s, ph = player.bob + (s2 > 0 ? 0 : PI); f.position.set(s2*.12, Math.max(0, Math.cos(ph))*.05*player.vel, -.2 - Math.sin(ph)*.16*player.vel); });
+  stars.position.copy(camera.position);
+  poseHands(dt, player.pose);
+}
+
+/* ---------------- render: color pass, id/depth pass, ink + wobble + grain post-pass (as Govardhan) ---------------- */
+const post = new THREE.ShaderMaterial({
+  uniforms: { tCol: { value: rtCol.texture }, tId: { value: rtId.texture }, uRes: { value: new V2(1, 1) }, uWob: { value: 2.4 }, uGrain: { value: .8 }, uTime: { value: 0 },
+    uInk: { value: 1.15 }, uFlash: { value: 0 }, uPulse: { value: 0 }, uInkC: { value: hv(INK) }, uGlowC: { value: hv('#f6b93b') } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }`,
+  fragmentShader: `precision highp float;
+uniform sampler2D tCol; uniform sampler2D tId; uniform vec2 uRes; uniform float uWob; uniform float uGrain; uniform float uTime; uniform float uInk; uniform float uFlash; uniform float uPulse;
+uniform vec3 uInkC; uniform vec3 uGlowC; varying vec2 vUv;
+float h21(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x*p.y); }
+float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3. - 2.*f); return mix(mix(h21(i), h21(i + vec2(1., 0.)), f.x), mix(h21(i + vec2(0., 1.)), h21(i + vec2(1., 1.)), f.x), f.y); }
+float fbm(vec2 p){ return .55*vn(p) + .3*vn(p*2.07 + 7.1) + .15*vn(p*4.13 + 3.7); }
+float dId(vec4 s){ float g = floor(s.g*255. + .5); return floor(s.r*255. + .5) + mod(g, 128.)*256.; }
+float dH(vec4 s){ return step(127.5, floor(s.g*255. + .5)); }
+float dW(vec4 s){ float dz = s.b + s.a/255.; return dz <= 0. ? 0. : 1./max(exp2(dz*9.) - 1., .01); }
+void main(){
+  float S = uRes.y/800.; vec2 px = vUv*uRes, q = px/S; float boil = floor(uTime*4.);
+  vec2 disp = vec2(fbm(q*.022 + vec2(boil*5.3, 1.7)), fbm(q*.022 + vec2(31.7, boil*2.9))) - .5;
+  vec2 uv = (px + disp*uWob*3.4*S)/uRes;
+  vec3 col = texture2D(tCol, uv).rgb;
+  vec4 s0 = texture2D(tId, uv); float id0 = dId(s0), w0 = dW(s0), h0 = dH(s0); float z0 = w0 > 0. ? 1./w0 : 999.;
+  float r = uInk*S*clamp(1.5 - z0/45., .6, 1.3);
+  float ink = 0., hl = 0.;
+  for (int i = 0; i < 4; i++){ float an = float(i)*.7854; vec2 o = vec2(cos(an), sin(an))*r/uRes;
+    vec4 a = texture2D(tId, uv + o), b = texture2D(tId, uv - o); float ia = dId(a), ib = dId(b);
+    if (ia != id0 || ib != id0){ ink = 1.; hl = max(hl, max(h0, max(dH(a), dH(b)))); }
+    else if (id0 > .5){ float wa = dW(a), wb = dW(b); if (abs(wa + wb - 2.*w0) > .2*w0) ink = 1.; } }
+  if (id0 > .5){ float r2 = r*2.2;
+    for (int i = 0; i < 8; i++){ float an = float(i)*.7854 + .39; vec2 o = vec2(cos(an), sin(an))*r2/uRes; vec4 a = texture2D(tId, uv + o); float ia = dId(a);
+      if (ia != id0 && (ia < .5 || dW(a) < w0*.72)){ ink = 1.; hl = max(hl, h0); } } }
+  float glow = 0.;
+  if (uPulse > 0. && h0 < .5){ for (int i = 0; i < 12; i++){ float an = float(i)*.5236; glow += dH(texture2D(tId, uv + vec2(cos(an), sin(an))*10.*S/uRes)); } glow /= 12.; }
+  col = mix(col, vec3(1., .86, .45), clamp(glow*1.6, 0., 1.)*.55*uPulse);
+  col = mix(col, mix(uInkC, vec3(.93, .55, .12), hl*uPulse), ink);
+  float g = .5*vn(q*.9) + .3*vn(q*.37 + 9.1) + .2*h21(floor(px));
+  col *= mix(1., .82 + .26*g, uGrain);
+  col *= 1. - .06*uGrain*(fbm(q*.005) - .5);
+  col = mix(col, vec3(1., .985, .93), uFlash*.55);
+  gl_FragColor = vec4(col, 1.);
+}` });
+const postScene = new THREE.Scene(), postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), post));
+function resize(){ const dpr = Math.min(devicePixelRatio || 1, 1.5); renderer.setPixelRatio(dpr); renderer.setSize(innerWidth, innerHeight, false);
+  const v = renderer.getDrawingBufferSize(new V2()); rtCol.setSize(v.x, v.y); rtId.setSize(v.x, v.y); post.uniforms.uRes.value.copy(v);
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+function skyColor(){ const n = G.night; return n < .5 ? hv(PAPER).lerp(hv(DUSK), n*2) : hv(DUSK).lerp(hv(NIGHT), (n - .5)*2); }
+function render(){
+  const sky = skyColor();
+  renderer.setRenderTarget(rtCol); renderer.setClearColor(new THREE.Color(sky.x, sky.y, sky.z), 1); camera.layers.enableAll(); renderer.render(scene, camera);
+  IDPASS = true; renderer.setRenderTarget(rtId); renderer.setClearColor(0x000000, 0); camera.layers.set(0); scene.overrideMaterial = idMat; renderer.render(scene, camera);
+  scene.overrideMaterial = null; IDPASS = false; camera.layers.enableAll();
+  const pu = post.uniforms; pu.uWob.value = SET.wob; pu.uGrain.value = SET.grain; pu.uTime.value = G.t; pu.uFlash.value = 0; pu.uPulse.value = G.glowing.length ? .65 + .35*Math.sin(G.t*3.2) : 0;
+  renderer.setRenderTarget(null); renderer.render(postScene, postCam);
+  hud();
+}
+function hud(){
+  drawBubbles(); drawStats(); drawLabels();
+  let showCue = false;
+  if (G.objTarget && !G.dlg && !camAuto()){ const t = G.objTarget(); if (t){ const p = t.clone().project(camera), behind = p.z > 1, off = behind || Math.abs(p.x) > .55 || Math.abs(p.y) > .7;
+    const far = Math.hypot(t.x - player.pos.x, t.z - player.pos.y);
+    if (off && (G.stuck > 3 || far > 10)){ let x = p.x, y = -p.y; if (behind){ x = -x; y = Math.abs(y) + .3; if (Math.abs(x) < .2) x = x < 0 ? -.4 : .4; }
+      const a = Math.atan2(y*innerHeight, x*innerWidth); $('cueArrow').setAttribute('transform', `rotate(${a*180/PI})`);
+      cueEl.style.transform = `translate(${Math.cos(a)*78}px,${Math.sin(a)*78}px)`; showCue = true; } } }
+  cueEl.classList.toggle('show', showCue);
+  crossEl.style.opacity = G.dlg || G.beat === 'lit' || G.veiled ? 0 : 1;
+}
+
+/* ---------------- main loop ---------------- */
+let lastT = performance.now(), firstFrame = true;
+function frame(now){ const dt = Math.min(.05, Math.max(0, (now - lastT)/1000)); lastT = now;
+  if (!G.selftestRunning){ update(dt); cameraStep(dt); render(); if (firstFrame){ firstFrame = false; setTimeout(() => { if (!G.veiled) $('veil').classList.add('off'); }, 60); } }
+  requestAnimationFrame(frame); }
+
+/* ---------------- hash states: jump to any beat with a set camera (screenshots, demos) ---------------- */
+function settle(sec){ const n = Math.round(sec*30); for (let i = 0; i < n; i++){ update(1/30); cameraStep(1/30); } }
+function finishDlg(){ let k = 0; while (G.dlg && k++ < 30) advance(); }
+function landNow(){ startArrive(); G.arriveT = 8.19; settle(.1); finishDlg(); }
+function walkTo(z, sec = 0){ player.yaw = 0; player.pitch = -.04; for (let i = 0; i < 4000 && player.pos.y > z; i++){ inp.f = 1; update(1/30); cameraStep(1/30); } inp.f = 0; if (sec) settle(sec); }
+function placeComp(){ COMP.forEach((n, i) => { n.pos.set(player.pos.x - 1.3 + i*1.3, player.pos.y + 2 + (i === 2 ? 1.5 : 0)); }); }
+const JUMP = {
+  vimana(){ startArrive(); settle(4.2); player.yaw = .1; player.pitch = -.12; },
+  landed(){ startArrive(); G.arriveT = 8.19; settle(.1); advance(); settle(.6); },
+  nandigram(){ landNow(); player.pos.set(.9, ZN + 4.6); player.y = 0; player.yaw = 0; player.pitch = -.1; placeComp(); settle(.6); },
+  padukas(){ JUMP.nandigram(); player.pos.set(.9, ZN + 1.7); settle(.2); talkBharata(); finishDlg(); settle(1.8); player.pitch = -.9; settle(.05); },
+  walk(){ JUMP.padukas(); wearPadukas(); player.pos.set(0, ZN - 3); placeComp(); walkTo(GATE_Z + 9, .9); player.pitch = .02; settle(.05); },
+  gate(){ JUMP.padukas(); wearPadukas(); walkTo(GATE_Z - 1, 1.2); player.pitch = .08; settle(.05); },
+  city(){ JUMP.padukas(); wearPadukas(); walkTo(-1, 1.6); player.yaw = .08; player.pitch = .1; settle(.05); },
+  rooftops(){ JUMP.padukas(); wearPadukas(); walkTo(14, 1.5); player.yaw = .55; player.pitch = .3; settle(.05); },
+  mothers(){ JUMP.padukas(); wearPadukas(); walkTo(STEP_Z + 7.4, 2.4); player.pos.set(.3, MOTHER_Z + 3.2); player.yaw = 0; player.pitch = .1; settle(.6); },
+  lit(){ JUMP.mothers(); MOTHERS.forEach(k => { G.talked[k] = true; NPC[k].pose = 'bless'; }); startLit(); settle(11); },
+  today(){ JUMP.padukas(); wearPadukas(); G.lampsOn = true; setupToday(); startRangoli(); settle(1.2); },
+  rangoli(){ JUMP.today(); player.pos.set(7.6, RC.z - .3); player.yaw = -PI/2; talkRiya(); finishDlg(); pickColour(BOWLS[0]); fillPetal(PETALS.find(p => !p.done)); pickColour(BOWLS[2]); settle(.4); player.pitch = -.72; settle(.05); },
+  diyas(){ JUMP.today(); G.filled = PETALS_EMPTY; setBeat('diyas'); startDiyas(); talkMother(); finishDlg(); player.pos.set(4.9, WALL_Z - 1.6); player.yaw = -PI/2 - .55; player.pitch = -.28; settle(.1); lightWall(); settle(.4); },
+  puja(){ JUMP.today(); startPuja(); player.pos.set(9.7, SHRINE.z - .1); player.yaw = -PI/2; player.pitch = -.3; G.puja.bell = true; G.puja.flower = true; PUJA.flowers[0].visible = true; settle(.2); waveLamp(); settle(1.6); },
+  mithai(){ JUMP.today(); startMithai(); player.pos.set(5.2, NPC.kamala.pos.y + 1.6); player.yaw = .55; settle(.3); talkKamala(); settle(.6); },
+  finale(){ JUMP.mithai(); finishDlg(); player.pos.set(1.5, CHZ + 4); settle(2.2); player.yaw = .35; player.pitch = .32; settle(.1); },
+  end(){ JUMP.mithai(); finishDlg(); settle(7); },
+};
+function applyHash(){
+  const parts = location.hash.slice(1).split('&').filter(Boolean), kv = {}, names = [];
+  for (const q of parts){ const [k, v] = q.split('='); if (v === undefined) names.push(k); else kv[k] = v; }
+  if (kv.from) G.from = kv.from;
+  const name = names[0];
+  if (name === 'selftest'){ G.started = true; selftest(); return; }
+  if (name && JUMP[name]){ G.started = true; $('title').hidden = true; JUMP[name]();
+    if (kv.yaw) player.yaw = +kv.yaw; if (kv.pitch) player.pitch = +kv.pitch; if (kv.wob) SET.wob = +kv.wob;
+    settle(.05); }
+  else { $('title').hidden = false; const v = vimPose(0); vim.position.copy(v.p); vim.rotation.set(0, v.yaw, 0); player.pos.copy(vimLocal(0, .5)); player.y = vim.position.y + DECK_Y; COMP.forEach(n => n.mode = 'ride'); npcs(0); }
+}
+
+/* ---------------- self-test: plays the island to the end with the same functions the controls use ---------------- */
+function selftest(){
+  G.selftestRunning = true; G.selftest = true; $('title').hidden = true; const log = [], T = $('test'); T.style.display = 'block';
+  const ok = (c, msg) => { log.push((c ? 'ok   ' : 'FAIL ') + msg); T.textContent = log.join('\n'); if (!c) throw new Error(msg); };
+  const run = (sec, f) => { const n = Math.round(sec*30); for (let i = 0; i < n; i++){ if (f && f()) return true; update(1/30); cameraStep(1/30); } return f ? !!f() : true; };
+  const go = (x, z) => { player.pos.set(x, z); run(.1); };
+  const face = p => { player.yaw = Math.atan2(-(p.x - player.pos.x), -(p.z - player.pos.y)); };
+  const look = p => { const e = new V3(player.pos.x, player.y + player.eye, player.pos.y); face(p); player.pitch = Math.atan2(p.y - e.y, Math.hypot(p.x - e.x, p.z - e.z)); cameraStep(0); };
+  const use = () => { cameraStep(0); const t = focusTarget(); if (!t) return false; t.use(); return true; };
+  const near = n => { go(n.pos.x + .2, n.pos.y + 1.6); face(npcAt(n)); player.pitch = 0; };
+  try {
+    startArrive(); ok(G.beat === 'arrive', 'beat 1: the Pushpaka Vimana flies in at dusk');
+    ok(run(10, () => G.beat === 'landed'), 'the vimana sets down at the island\'s edge'); ok(G.night > .95, 'night has fallen: Amavasya, sky indigo');
+    ok(!!G.dlg && G.dlg.lines[0][0] === 'Sita', 'Sita, Lakshmana and Hanuman speak on landing'); finishDlg(); ok(G.beat === 'bharata', 'beat 2: go to Bharata');
+    player.yaw = 0; inp.f = 1; ok(run(12, () => focusTarget() && focusTarget().label === 'Talk to Bharata'), 'walked off the vimana to Bharata at Nandigram'); inp.f = 0;
+    ok(use(), 'E on Bharata opens the talk'); finishDlg(); ok(G.beat === 'padukas', 'Bharata places the padukas');
+    ok(run(3, () => G.padT > 1.6), 'padukas set down before you'); look(padG.position); ok(use(), 'E wears the padukas'); ok(H.feet.every(f => f.userData.pad.visible), 'padukas on your feet');
+    ok(G.beat === 'walk', 'beat 3: walk home to Ayodhya');
+    const lit0 = litCount; player.yaw = 0; player.pitch = 0; inp.f = 1; let peak = 0;
+    ok(run(60, () => { peak = Math.max(peak, QUEUE.length); return G.beat === 'mothers'; }), 'walked the road through the gate to the palace steps'); inp.f = 0;
+    ok(litCount - lit0 > 300, 'lamps lit ahead of you along the way: ' + litCount);
+    ok(LAMPS.filter(L => L.lit && L.y > 3).length > 100, 'rooftops and walls lit too: ' + LAMPS.filter(L => L.lit && L.y > 3).length);
+    ok(VILL.filter(v => v.npc.out).length >= 12, 'the people of Ayodhya came out with lamps: ' + VILL.filter(v => v.npc.out).length);
+    run(3); ok(G.warm.w > .3, 'the lit part of the road glows warm');
+    for (const k of MOTHERS){ near(NPC[k]); ok(use(), 'greet ' + NPC[k].d.name); finishDlg(); }
+    ok(G.beat === 'lit', 'beat 5: Ayodhya lit, the slow wide view'); run(4); ok(LAMPS.every(L => L.lit) || QUEUE.length > 0, 'every lamp in the city lights');
+    ok(run(20, () => G.beat === 'rangoli'), 'beat 6: the story shifts to today'); ok(NPCS.filter(n => n.d.today).every(n => n.g.visible), 'families of today fill the lane');
+    near(NPC.riya); ok(use(), 'talk to Riya at her rangoli'); finishDlg(); go(RC.x - 1.5, RC.z + .8);
+    for (let i = 0; i < PETALS_EMPTY; i++){ const b = BOWLS[(i*2)%BOWLS.length]; look(b.g.position.clone().setY(.1)); ok(use(), 'take ' + colourName(b.P) + ' powder');
+      const p = PETALS.find(q => !q.done); look(p.pos); ok(use(), 'fill petal ' + (i + 1)); }
+    ok(G.filled === PETALS_EMPTY, 'rangoli finished: ' + G.filled + ' petals');
+    ok(run(5, () => G.beat === 'diyas'), 'next: the wall of diyas'); near(NPC.mother); ok(use(), 'Riya\'s mother gives you a lamp'); finishDlg();
+    go(5.3, WALL_Z - 1.6); look(WALLD[0].d.position.clone().setY(1.06)); ok(use(), 'light the first diya'); ok(run(3, () => G.wallLit >= WALLN), 'the flame passes along the wall, 60 ms apart: ' + G.wallLit);
+    ok(run(6, () => G.beat === 'puja'), 'the Lakshmi puja'); go(SHRINE.x - 2, SHRINE.z);
+    for (const [k, o] of PUJA_ITEMS()){ look(wpos(o).add(new V3(0, .05, 0))); ok(use(), k === 'bell' ? 'ring the bell' : k === 'aarti' ? 'wave the lamp' : 'offer a flower'); run(k === 'aarti' ? 4.6 : .3); }
+    ok(['bell', 'aarti', 'flower'].every(k => G.puja[k]), 'puja done, with nothing scored or timed');
+    ok(run(8, () => G.beat === 'mithai'), 'a neighbour shares mithai'); near(NPC.kamala); ok(use(), 'take a sweet'); finishDlg();
+    ok(run(9, () => G.ended), 'fireworks, then the why-card'); ok(!$('why').hidden, '"Why we celebrate Diwali" card is up');
+    ok(ERR.length === 0, 'no script errors' + (ERR.length ? ': ' + ERR.join(' | ') : ''));
+    log.push('SELFTEST PASS'); document.title = 'SELFTEST PASS'; console.log('SELFTEST PASS\n' + log.join('\n'));
+  } catch (e){ log.push('SELFTEST FAIL: ' + e.message + (e.stack ? '\n' + e.stack.split('\n').slice(0, 3).join('\n') : '')); document.title = 'SELFTEST FAIL'; console.log('SELFTEST FAIL\n' + log.join('\n')); }
+  T.textContent = log.join('\n'); $('why').hidden = true; G.selftestRunning = false; G.paused = false;
+}
+
+window.GAME = { G, player, NPC, LAMPS, ROWS };
+applyHash(); cameraStep(1/30);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
