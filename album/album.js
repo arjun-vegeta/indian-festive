@@ -18,7 +18,12 @@ window.FESTIVE_ALBUM = {
     { src: '3.jpg', caption: 'Brothers making a Ganesh rangoli' },
     { src: '4.jpg', caption: 'Feeding sweets to the little one' },
   ],
-  durga: [],
+  durga: [
+    { src: '1.jpg', caption: 'Family at the Durga pandal' },
+    { src: '2.jpg', caption: 'Holding the aarti plate' },
+    { src: '3.jpg', caption: 'Bhog with my brothers' },
+    { src: '4.jpg', caption: 'Mum and Dad at the pandal' },
+  ],
   dussehra: [
     { src: '1.jpg', caption: 'Family with Happy Dussehra sign' },
     { src: '2.jpg', caption: 'Little archer with his bow' },
@@ -31,6 +36,11 @@ window.FESTIVE_ALBUM = {
     { src: '3.jpg', caption: 'Lighting diyas by the rangoli' },
     { src: '4.jpg', caption: 'Holding a sparkler at night' },
   ],
-  govardhan: [],
+  govardhan: [
+    { src: '1.jpg', caption: 'Our little Govardhan hill' },
+    { src: '2.jpg', caption: 'Setting out the Annakut' },
+    { src: '3.jpg', caption: 'Aarti for the hill' },
+    { src: '4.jpg', caption: 'Prayers by the hill' },
+  ],
   dadi: {},
 };
