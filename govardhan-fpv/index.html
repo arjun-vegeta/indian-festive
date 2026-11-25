@@ -1070,7 +1070,7 @@ const JUMP = {
   end(){ JUMP.celebrate(); G.thanked = 3; G.beat = 'finale'; G.beatT = 4.8; settle(.5); },
 };
 function applyHash(){
-  const parts = location.hash.slice(1).split('&').filter(Boolean), name = parts[0];
+  const parts = location.hash.slice(1).split('&').filter(p => p && !p.startsWith('from=')), name = parts[0];
   if (name === 'selftest'){ G.started = true; selftest(); return; }
   if (name && JUMP[name]){ G.started = true; $('title').hidden = true; JUMP[name]();
     for (const q of parts.slice(1)){ const [k, v] = q.split('='); if (k === 'yaw') player.yaw = +v; if (k === 'pitch') player.pitch = +v; if (k === 'wob') SET.wob = +v; }
@@ -1117,6 +1117,23 @@ async function selftest(){
     log.push('SELFTEST PASS'); document.title = 'SELFTEST PASS'; console.log('SELFTEST PASS\n' + log.join('\n'));
   } catch (e){ log.push('SELFTEST FAIL: ' + e.message); document.title = 'SELFTEST FAIL'; console.log('SELFTEST FAIL\n' + log.join('\n')); }
   T.textContent = log.join('\n'); $('end').hidden = true; G.selftestRunning = false; G.paused = false;
+}
+
+/* ---------------- hub hookup: only with from=hub in the hash, so the standalone game is unchanged ----------------
+   Arriving from the Festival Islands hub, the page starts under a sheet of paper that lifts after the first frame.
+   The end card gets a "Back to the islands" button that fades the paper back in and returns to ../index.html#done=govardhan. */
+if (location.hash.slice(1).split('&').includes('from=hub')){
+  const st = document.createElement('style');
+  st.textContent = `#hubFade{position:fixed;inset:0;z-index:40;background:#f4efe3;display:flex;align-items:center;justify-content:center;padding:24px;opacity:1;transition:opacity .6s ease}
+#hubFade::before{content:"";position:absolute;inset:0;pointer-events:none;mix-blend-mode:multiply;opacity:.6;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .17 0 0 0 0 .13 0 0 0 0 .09 0 0 0 .55 -.12'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+#hubFade.out{opacity:0;pointer-events:none}
+#hubFade .t{position:relative;font-weight:800;font-size:clamp(22px,3.4vw,38px);text-align:center;line-height:1.2;max-width:900px}`;
+  document.head.appendChild(st);
+  const fade = document.createElement('div'); fade.id = 'hubFade'; fade.innerHTML = '<div class="t"></div>'; document.body.appendChild(fade);
+  requestAnimationFrame(() => requestAnimationFrame(() => fade.classList.add('out')));
+  const back = document.createElement('button'); back.id = 'backHub'; back.className = 'go'; back.textContent = 'Back to the islands';
+  $('end').querySelector('.row').appendChild(back);
+  back.onclick = () => { fade.querySelector('.t').textContent = 'Back to the islands'; fade.classList.remove('out'); setTimeout(() => { location.href = '../index.html#done=govardhan'; }, 640); };
 }
 
 window.GAME = { G, player, NPC, hill, inp };
