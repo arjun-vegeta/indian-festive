@@ -128,6 +128,7 @@
       <li><span class="key">Esc</span>pause and settings</li>
     </ul>
     <div class="row"><button class="go" id="begin">Begin</button></div>
+    <p class="cr"><a id="musicCredit" target="_blank" rel="noopener"></a></p>
     <p class="cr">Look inspired by <a href="https://april-zhu.com/colorfigures" target="_blank" rel="noopener">Colorfigures</a> by April Zhu (MIT). Made for Festive Hacks 2026.</p>
   </div>
 </div>
@@ -161,6 +162,8 @@
 <div id="test"></div>
 <div id="fatal"></div>
 
+<script src="../audio/narration.js"></script>
+<script src="../audio/playback.js"></script>
 <script type="module">
 import * as THREE from 'three';
 THREE.ColorManagement.enabled = false;
@@ -552,6 +555,7 @@ const inp = { f: 0, b: 0, l: 0, r: 0, hold: false, flute: false, mdx: 0, mdy: 0,
 const SET = { wob: 2.4, grain: .8, sens: 1, vol: .7 };
 
 /* ---------------- sound: synthesised flute, rain, wind, thunder, bells ---------------- */
+const festivalAudio = createFestivalAudio('govardhan');
 const sfx = (() => {
   let ctx = null, master, rainG, rainLP, windG, windBP, rumbleG, noiseBuf;
   const SCALE = [293.66, 329.63, 369.99, 440, 493.88, 587.33, 659.25];
@@ -698,7 +702,7 @@ const DAYLINES = [['yashoda', 'Rest your arm, my child. No? Then at least eat a 
 function startDays(){ G.beat = 'days'; G.day = 1; G.dayT = 0; G.dayLine = 0; G.nextGust = 2; G.bal.set(0, 0); progress(); setGlow([]);
   objective('Hold Govardhan steady while the storm rages', null, ['Each time the wind pushes the dot, move the mouse against it. The days only pass while the hill is steady.']);
   shelterDiyas.forEach((d, i) => { const a = (i + .5)/shelterDiyas.length*TAU + .3; d.position.set(hill.pos.x + Math.cos(a)*2.6, 0, hill.pos.z + Math.sin(a)*2.6); d.visible = true; }); }
-function startRelent(){ G.beat = 'relent'; G.relentT = 0; G.gust = null; progress();
+function startRelent(){ G.beat = 'relent'; festivalAudio.musicCue(); festivalAudio.narrate('govardhanClearing'); G.relentT = 0; G.gust = null; progress();
   objective('The rain is stopping', null); say(NPC.nanda, 'The clouds are parting. Indra has seen that no one in Vraj was hurt.', 5);
   NPCS.forEach((n, i) => { n.mode = 'walk'; n.safe = false; const a = PI*.12 + (i/(NPCS.length - 1))*PI*.76, r = n.cow ? 7.5 : 4.6;
     n.target = new V2(ANNA.x + r*1.2*Math.cos(a), ANNA.y + 1 + r*Math.sin(a)); n.speed = n.cow ? 1.6 : 2; n.pose = 'down'; }); }
@@ -764,14 +768,14 @@ addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; sfx
   if (e.code === 'KeyF'){ inp.flute = true; } });
 addEventListener('keyup', e => { if (KEYS[e.code]) inp[KEYS[e.code]] = 0; if (e.code === 'Space') inp.hold = false; if (e.code === 'KeyF') inp.flute = false; });
 addEventListener('blur', () => { inp.f = inp.b = inp.l = inp.r = 0; inp.hold = inp.flute = false; dragging = false; });
-function pauseGame(on){ G.paused = on; $('pause').hidden = !on; if (on){ inp.hold = inp.flute = false; inp.f = inp.b = inp.l = inp.r = 0; if (locked) document.exitPointerLock(); } else grab(); }
+function pauseGame(on){ festivalAudio.pause(on); G.paused = on; $('pause').hidden = !on; if (on){ inp.hold = inp.flute = false; inp.f = inp.b = inp.l = inp.r = 0; if (locked) document.exitPointerLock(); } else grab(); }
 $('resume').onclick = () => pauseGame(false);
 $('restart').onclick = () => { location.hash = ''; location.reload(); };
 $('again').onclick = () => { location.hash = ''; location.reload(); };
 $('stay').onclick = () => { $('end').hidden = true; G.ended = false; grab(); };
-$('begin').onclick = () => { $('title').hidden = true; G.started = true; sfx.init(); grab(); };
+$('begin').onclick = () => { $('title').hidden = true; G.started = true; sfx.init(); festivalAudio.start(); grab(); };
 $('sWob').oninput = e => SET.wob = +e.target.value; $('sGrain').oninput = e => SET.grain = +e.target.value;
-$('sSens').oninput = e => SET.sens = +e.target.value; $('sVol').oninput = e => { SET.vol = +e.target.value; sfx.vol(SET.vol); };
+$('sSens').oninput = e => SET.sens = +e.target.value; $('sVol').oninput = e => { SET.vol = +e.target.value; sfx.vol(SET.vol); festivalAudio.setVolume(SET.vol); };
 
 /* ---------------- simulation ---------------- */
 const BALANCE_BEATS = ['balance', 'days'];
@@ -1040,7 +1044,7 @@ function hud(){
 
 /* ---------------- main loop ---------------- */
 let lastT = performance.now();
-function frame(now){ const dt = Math.min(.05, Math.max(0, (now - lastT)/1000)); lastT = now;
+function frame(now){ festivalAudio.tick(!!G.dlg); const dt = Math.min(.05, Math.max(0, (now - lastT)/1000)); lastT = now;
   if (!G.selftestRunning){ update(dt); cameraStep(dt); render(); }
   requestAnimationFrame(frame); }
 
@@ -1133,7 +1137,7 @@ if (location.hash.slice(1).split('&').includes('from=hub')){
   requestAnimationFrame(() => requestAnimationFrame(() => fade.classList.add('out')));
   const back = document.createElement('button'); back.id = 'backHub'; back.className = 'go'; back.textContent = 'Back to the islands';
   $('end').querySelector('.row').appendChild(back);
-  back.onclick = () => { fade.querySelector('.t').textContent = 'Back to the islands'; fade.classList.remove('out'); setTimeout(() => { location.href = '../index.html#done=govardhan'; }, 640); };
+  back.onclick = () => { festivalAudio.stop(); fade.querySelector('.t').textContent = 'Back to the islands'; fade.classList.remove('out'); setTimeout(() => { location.href = '../index.html#done=govardhan'; }, 640); };
 }
 
 window.GAME = { G, player, NPC, hill, inp };

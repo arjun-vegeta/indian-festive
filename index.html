@@ -141,6 +141,7 @@
       <li><span class="key">Esc</span>pause and settings</li>
     </ul>
     <div class="row"><button class="go" id="begin">Begin</button></div>
+    <p class="cr"><a id="musicCredit" target="_blank" rel="noopener"></a></p>
     <p class="cr">Look inspired by <a href="https://april-zhu.com/colorfigures" target="_blank" rel="noopener">Colorfigures</a> by April Zhu (MIT). Made for Festive Hacks 2026.</p>
   </div>
 </div>
@@ -166,6 +167,8 @@
 <div id="test"></div>
 <div id="fatal"></div>
 
+<script src="audio/narration.js"></script>
+<script src="audio/playback.js"></script>
 <script type="module">
 import * as THREE from 'three';
 THREE.ColorManagement.enabled = false;
@@ -793,6 +796,7 @@ const inp = { f: 0, b: 0, l: 0, r: 0, mdx: 0, mdy: 0 };
 const SET = { wob: 2.4, grain: .8, sens: 1, vol: .7 };
 
 /* ---------------- sound: bells, a soft step on stone, a gate chime, the wind up here ---------------- */
+const festivalAudio = createFestivalAudio('hub');
 const sfx = (() => {
   let ctx = null, master, windG, windBP, noiseBuf;
   function init(){ if (ctx) return; try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
@@ -858,7 +862,7 @@ const dlgEl = $('dlg');
 function dialog(n, lines, done){ G.dlg = { n, lines, i: 0, done }; dlgEl.style.display = 'block'; showLine(); progress(); }
 function showLine(){ const [who, text] = G.dlg.lines[G.dlg.i], you = who === 'you';
   $('dlgWho').textContent = you ? 'You' : who; $('dlgWho').className = 'who' + (you ? ' you' : ''); $('dlgLine').textContent = text; }
-function advance(){ if (!G.dlg) return; G.dlg.i++; if (G.dlg.i >= G.dlg.lines.length){ const f = G.dlg.done; G.dlg = null; dlgEl.style.display = 'none'; if (f) f(); } else showLine(); }
+function advance(){ if (!G.dlg) return; festivalAudio.stopVoice(); G.dlg.i++; if (G.dlg.i >= G.dlg.lines.length){ const f = G.dlg.done; G.dlg = null; dlgEl.style.display = 'none'; if (f) f(); } else showLine(); }
 
 /* ---------------- Dadi, the journey and progress ---------------- */
 const Y = 'you';
@@ -884,7 +888,7 @@ const ALL_DONE = [['Dadi', 'You walked all three stories, beta. Dussehra, Diwali
 const ALL_BUBBLE = 'All three stories! The other islands are still being drawn.';
 function dadiLines(){ if (DONE.length === ORDER.length) return ALL_DONE; if (G.lastDone && DONE.includes(G.lastDone)) return DONE_LINES[G.lastDone];
   const n = nextStory(); return [['Dadi', `Next is ${STORY[n].fest}: ${STORY[n].story}. Follow the glowing stones, beta.`]]; }
-function talkDadi(){ if (!G.introDone){ dialog(DADI, INTRO, () => { G.introDone = true; refreshObjective(); }); return; } dialog(DADI, dadiLines(), null); }
+function talkDadi(){ if (!G.introDone){ dialog(DADI, INTRO, () => { G.introDone = true; refreshObjective(); }); festivalAudio.narrate('dadiWelcome'); return; } dialog(DADI, dadiLines(), null); }
 const dadiWorld = () => { const v = new V3(); DADI.g.getWorldPosition(v); return v; };
 const yawTo = p => Math.atan2(-(p.x - player.pos.x), -(p.z - player.pos.y));
 const islandOf = id => ISL[STORY[id].isl];
@@ -910,7 +914,7 @@ function arrive(id){ if (!DONE.includes(id)){ DONE.push(id); saveDone(DONE); } G
 function atGate(id){ const gt = GATES[id], I = gt.I, [lx, lz] = gt.F.at(gt.pu + 4.3, 0); G.introDone = true; G.mode = 'play';
   spawnAt(I.x + lx, I.z + lz, 0); player.yaw = yawTo(gt.world()); player.pitch = .17; refreshObjective(); }
 // leave for a story: the paper sheet fades in, a one-line title, then the island page
-function leave(url, title){ G.leaving = true; G.lastNav = url; $('fadeT').textContent = title; fadeEl.classList.remove('out');
+function leave(url, title){ festivalAudio.stop(); G.leaving = true; G.lastNav = url; $('fadeT').textContent = title; fadeEl.classList.remove('out');
   if (G.selftest) return; if (locked) document.exitPointerLock(); setTimeout(() => { location.href = url; }, 640); }
 function enterStory(id){ if (G.leaving) return; const s = STORY[id]; sfx.chime(); leave(s.url + '#from=hub', `${s.fest} · ${s.story} · You are ${s.hero}`); }
 
@@ -960,12 +964,12 @@ addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; sfx
 function jump(){ if (!G.started || G.paused || G.mode !== 'play' || G.leaving || player.jy > 0) return; player.vy = 4.6; player.jy = 1e-4; }
 addEventListener('keyup', e => { if (KEYS[e.code]) inp[KEYS[e.code]] = 0; });
 addEventListener('blur', () => { inp.f = inp.b = inp.l = inp.r = 0; dragging = false; });
-function pauseGame(on){ G.paused = on; $('pause').hidden = !on; if (on){ inp.f = inp.b = inp.l = inp.r = 0; if (locked) document.exitPointerLock(); } else grab(); }
+function pauseGame(on){ festivalAudio.pause(on); G.paused = on; $('pause').hidden = !on; if (on){ inp.f = inp.b = inp.l = inp.r = 0; if (locked) document.exitPointerLock(); } else grab(); }
 $('resume').onclick = () => pauseGame(false);
 $('forget').onclick = () => { DONE = []; saveDone(DONE); G.lastDone = null; G.from = 'home'; G.introDone = false; refreshObjective(); pauseGame(false); };
-$('begin').onclick = () => { $('title').hidden = true; G.started = true; sfx.init(); grab(); };
+$('begin').onclick = () => { $('title').hidden = true; G.started = true; sfx.init(); festivalAudio.start(); grab(); };
 $('sWob').oninput = e => SET.wob = +e.target.value; $('sGrain').oninput = e => SET.grain = +e.target.value;
-$('sSens').oninput = e => SET.sens = +e.target.value; $('sVol').oninput = e => { SET.vol = +e.target.value; sfx.vol(SET.vol); };
+$('sSens').oninput = e => SET.sens = +e.target.value; $('sVol').oninput = e => { SET.vol = +e.target.value; sfx.vol(SET.vol); festivalAudio.setVolume(SET.vol); };
 
 /* ---------------- simulation ---------------- */
 function animate(dt){
@@ -1107,7 +1111,7 @@ function hud(){
 
 /* ---------------- main loop; the paper sheet lifts after the first frame is drawn ---------------- */
 let lastT = performance.now(), firstFrame = true;
-function frame(now){ const dt = Math.min(.05, Math.max(0, (now - lastT)/1000)); lastT = now;
+function frame(now){ festivalAudio.tick(!!G.dlg); const dt = Math.min(.05, Math.max(0, (now - lastT)/1000)); lastT = now;
   if (!G.selftestRunning){ update(dt); cameraStep(dt); render(); if (firstFrame){ firstFrame = false; requestAnimationFrame(() => { if (!G.leaving) fadeEl.classList.add('out'); }); } }
   requestAnimationFrame(frame); }
 
