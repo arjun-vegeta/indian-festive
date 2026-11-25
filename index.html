@@ -81,6 +81,7 @@
   #dlg .who{font-weight:800;font-size:12.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
   #dlg .who.you{color:var(--kb)}
   #dlg .line{font-size:20px;line-height:1.35;margin:1px 0 4px;font-weight:600}
+  #replayLine{pointer-events:auto;font-weight:400;font-size:inherit;margin-right:8px}
   #dlg .more{font-size:12.5px;color:var(--muted);text-align:right;font-weight:700}
   .ov #obj,.ov #hint,.ov #stats,.ov #cross,.ov #prompt,.ov #cue{display:none}
   .card{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(42,33,24,.34);z-index:10;padding:16px}
@@ -127,7 +128,7 @@
   <div id="cross"></div>
   <div id="cue"><svg width="34" height="34" viewBox="-17 -17 34 34"><g id="cueArrow"><path d="M-6 -11 L8 0 L-6 11 L-2 0 Z" fill="#f6b93b" stroke="#2a2118" stroke-width="2.4" stroke-linejoin="round"/></g></svg></div>
   <div id="prompt"></div>
-  <div id="dlg" role="dialog" aria-live="polite"><div class="who" id="dlgWho"></div><div class="line" id="dlgLine"></div><div class="more">E, Space or click to go on</div></div>
+  <div id="dlg" role="dialog" aria-live="polite"><div class="who" id="dlgWho"></div><div class="line" id="dlgLine"></div><div class="more"><button type="button" id="replayLine" hidden>Replay line (R)</button>E, Space or click to go on</div></div>
 </div>
 
 <div class="card" id="title" hidden>
@@ -158,7 +159,9 @@
       <div><label for="sWob">Hand-drawn wobble</label><input id="sWob" type="range" min="0" max="7" step="0.1" value="2.4"></div>
       <div><label for="sGrain">Paper grain</label><input id="sGrain" type="range" min="0" max="1" step="0.05" value="0.8"></div>
       <div><label for="sSens">Mouse speed</label><input id="sSens" type="range" min="0.3" max="2.5" step="0.05" value="1"></div>
-      <div><label for="sVol">Sound</label><input id="sVol" type="range" min="0" max="1" step="0.05" value="0.7"></div>
+      <div><label for="voiceVolume">Voice</label><input id="voiceVolume" type="range" min="0" max="1" step="0.05" value="0.7"></div>
+      <div><label for="musicVolume">Music</label><input id="musicVolume" type="range" min="0" max="1" step="0.05" value="0.7"></div>
+      <div><label for="effectsVolume">Effects</label><input id="effectsVolume" type="range" min="0" max="1" step="0.05" value="0.7"></div>
     </div>
     <div class="row"><button id="forget">Forget my progress</button><button class="go" id="resume">Resume</button></div>
   </div>
@@ -794,14 +797,14 @@ const player = { pos: new V2(-.5, 7.4), yaw: 0, pitch: -.05, bob: 0, eye: 1.15, 
 const G = { mode: 'play', t: 0, beatT: 0, stuck: 0, started: false, paused: false, glowing: [], introDone: DONE.length > 0, lastDone: null, from: 'home',
   leaving: false, lastNav: null, objTarget: null, hints: [], hintShown: 0, onStone: null };
 const inp = { f: 0, b: 0, l: 0, r: 0, mdx: 0, mdy: 0 };
-const SET = { wob: 2.4, grain: .8, sens: 1, vol: .7 };
+const SET = { wob: 2.4, grain: .8, sens: 1 };
 
 /* ---------------- sound: bells, a soft step on stone, a gate chime, the wind up here ---------------- */
 const festivalAudio = createFestivalAudio('hub');
 const sfx = (() => {
   let ctx = null, master, windG, windBP, noiseBuf;
   function init(){ if (ctx) return; try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
-    master = ctx.createGain(); master.gain.value = SET.vol; master.connect(ctx.destination);
+    master = ctx.createGain(); master.gain.value = festivalAudio.effectsVolume(); master.connect(ctx.destination);
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate*2, ctx.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random()*2 - 1;
     const s = ctx.createBufferSource(); s.buffer = noiseBuf; s.loop = true; s.start();
     windBP = ctx.createBiquadFilter(); windBP.type = 'bandpass'; windBP.frequency.value = 420; windBP.Q.value = .7; windG = ctx.createGain(); windG.gain.value = 0;
@@ -810,7 +813,7 @@ const sfx = (() => {
   const tone = (f, v, rel, t0 = 0) => { const t = ctx.currentTime + t0, o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = f; o.connect(g); g.connect(master); env(g, t, .005, v, rel); o.start(t); o.stop(t + rel + .1); };
   return {
     init, get on(){ return !!ctx; },
-    vol(v){ if (master) master.gain.value = v; },
+    vol(v){ if (master) master.gain.setTargetAtTime(v, ctx.currentTime, .05); },
     bell(){ if (!ctx) return; for (const [f, v] of [[880, .12], [1326, .06], [2210, .03]]) tone(f, v, 1.8); },
     tock(){ if (!ctx) return; tone(320 + Math.random()*60, .07, .14); tone(640, .02, .08); },
     chime(){ if (!ctx) return; [587.33, 659.25, 880, 987.77].forEach((f, i) => tone(f, .07, 1.1, i*.09)); },
@@ -863,7 +866,7 @@ const dlgEl = $('dlg');
 function dialog(n, lines, done){ G.dlg = { n, lines, i: 0, done }; dlgEl.style.display = 'block'; showLine(); progress(); }
 function showLine(){ const [who, text] = G.dlg.lines[G.dlg.i], you = who === 'you';
   $('dlgWho').textContent = you ? 'You' : who; $('dlgWho').className = 'who' + (you ? ' you' : ''); $('dlgLine').textContent = text; festivalAudio.narrateDialogue(G.dlg.lines, G.dlg.i); }
-function advance(){ if (!G.dlg) return; festivalAudio.stopVoice(); G.dlg.i++; if (G.dlg.i >= G.dlg.lines.length){ const f = G.dlg.done; G.dlg = null; dlgEl.style.display = 'none'; if (f) f(); } else showLine(); }
+function advance(){ if (!G.dlg) return; festivalAudio.stopDialogue(); G.dlg.i++; if (G.dlg.i >= G.dlg.lines.length){ const f = G.dlg.done; G.dlg = null; dlgEl.style.display = 'none'; if (f) f(); } else showLine(); }
 
 /* ---------------- Dadi, the journey and progress ---------------- */
 const Y = 'you';
@@ -959,7 +962,8 @@ $('resume').onclick = () => pauseGame(false);
 $('forget').onclick = () => { DONE = []; saveDone(DONE); G.lastDone = null; G.from = 'home'; G.introDone = false; refreshObjective(); pauseGame(false); };
 $('begin').onclick = () => { $('title').hidden = true; G.started = true; sfx.init(); festivalAudio.start(); grab(); };
 $('sWob').oninput = e => SET.wob = +e.target.value; $('sGrain').oninput = e => SET.grain = +e.target.value;
-$('sSens').oninput = e => SET.sens = +e.target.value; $('sVol').oninput = e => { SET.vol = +e.target.value; sfx.vol(SET.vol); festivalAudio.setVolume(SET.vol); };
+$('sSens').oninput = e => SET.sens = +e.target.value;
+festivalAudio.bindEffects(sfx.vol);
 
 /* ---------------- simulation ---------------- */
 function animate(dt){
@@ -1101,7 +1105,8 @@ function hud(){
 
 /* ---------------- main loop; the paper sheet lifts after the first frame is drawn ---------------- */
 let lastT = performance.now(), firstFrame = true;
-function frame(now){ festivalAudio.tick(!!G.dlg); const dt = Math.min(.05, Math.max(0, (now - lastT)/1000)); lastT = now;
+function frame(now){ const dt = Math.min(.05, Math.max(0, (now - lastT)/1000)); lastT = now;
+  festivalAudio.tick(!!G.dlg, dt);
   if (!G.selftestRunning){ update(dt); cameraStep(dt); render(); if (firstFrame){ firstFrame = false; requestAnimationFrame(() => { if (!G.leaving) fadeEl.classList.add('out'); }); } }
   requestAnimationFrame(frame); }
 

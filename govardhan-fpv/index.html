@@ -65,6 +65,7 @@
   #dlg .who{font-weight:800;font-size:12.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
   #dlg .who.you{color:var(--kb)}
   #dlg .line{font-size:20px;line-height:1.35;margin:1px 0 4px;font-weight:600}
+  #replayLine{pointer-events:auto;font-weight:400;font-size:inherit;margin-right:8px}
   #dlg .more{font-size:12.5px;color:var(--muted);text-align:right;font-weight:700}
   #bal{position:absolute;left:50%;top:50%;opacity:0;transition:opacity .4s}
   #bal.show{opacity:1}
@@ -113,7 +114,7 @@
     <circle id="balDot" r="9" fill="#f6b93b" stroke="#2a2118" stroke-width="2.6"/>
   </svg></div>
   <div id="prompt"></div>
-  <div id="dlg" role="dialog" aria-live="polite"><div class="who" id="dlgWho"></div><div class="line" id="dlgLine"></div><div class="more">E, Space or click to go on</div></div>
+  <div id="dlg" role="dialog" aria-live="polite"><div class="who" id="dlgWho"></div><div class="line" id="dlgLine"></div><div class="more"><button type="button" id="replayLine" hidden>Replay line (R)</button>E, Space or click to go on</div></div>
 </div>
 
 <div class="card" id="title" hidden>
@@ -146,7 +147,9 @@
       <div><label for="sWob">Hand-drawn wobble</label><input id="sWob" type="range" min="0" max="7" step="0.1" value="2.4"></div>
       <div><label for="sGrain">Paper grain</label><input id="sGrain" type="range" min="0" max="1" step="0.05" value="0.8"></div>
       <div><label for="sSens">Mouse speed</label><input id="sSens" type="range" min="0.3" max="2.5" step="0.05" value="1"></div>
-      <div><label for="sVol">Sound</label><input id="sVol" type="range" min="0" max="1" step="0.05" value="0.7"></div>
+      <div><label for="voiceVolume">Voice</label><input id="voiceVolume" type="range" min="0" max="1" step="0.05" value="0.7"></div>
+      <div><label for="musicVolume">Music</label><input id="musicVolume" type="range" min="0" max="1" step="0.05" value="0.7"></div>
+      <div><label for="effectsVolume">Effects</label><input id="effectsVolume" type="range" min="0" max="1" step="0.05" value="0.7"></div>
     </div>
     <div class="row"><button id="restart">Start again</button><button class="go" id="resume">Resume</button></div>
   </div>
@@ -553,27 +556,28 @@ const G = { beat: 'talk', step: 0, t: 0, storm: 0, stormT: 0, night: 0, rainbow:
   fluteT: 0, noteI: 0, rippleT: 0, relentT: 0, celebrateT: 0, ended: false, paused: false, started: false, hillHome: true, holdingHill: false,
   hillFrom: new V3(), dayLine: 0, beatT: 0, glowing: [], hintShown: 0, objTarget: null, lastObj: '' };
 const inp = { f: 0, b: 0, l: 0, r: 0, hold: false, flute: false, mdx: 0, mdy: 0, e: false };
-const SET = { wob: 2.4, grain: .8, sens: 1, vol: .7 };
+const SET = { wob: 2.4, grain: .8, sens: 1 };
 
 /* ---------------- sound: synthesised flute, rain, wind, thunder, bells ---------------- */
 const festivalAudio = createFestivalAudio('govardhan');
 const sfx = (() => {
-  let ctx = null, master, rainG, rainLP, windG, windBP, rumbleG, noiseBuf;
+  let ctx = null, master, rainG, rainLP, edgeRain, windG, windBP, rumbleG, noiseBuf;
   const SCALE = [293.66, 329.63, 369.99, 440, 493.88, 587.33, 659.25];
   const TUNE = [2, 3, 4, 5, 4, 3, 2, 1, 0, 1, 2, 3, 3, 4, 5, 6, 5, 4, 3, 2];
   function init(){ if (ctx) return; try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
-    master = ctx.createGain(); master.gain.value = SET.vol; master.connect(ctx.destination);
+    master = ctx.createGain(); master.gain.value = festivalAudio.effectsVolume(); master.connect(ctx.destination);
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate*2, ctx.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random()*2 - 1;
     const loop = () => { const s = ctx.createBufferSource(); s.buffer = noiseBuf; s.loop = true; s.start(); return s; };
     const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 700; rainLP = ctx.createBiquadFilter(); rainLP.type = 'lowpass'; rainLP.frequency.value = 6000;
     rainG = ctx.createGain(); rainG.gain.value = 0; loop().connect(hp); hp.connect(rainLP); rainLP.connect(rainG); rainG.connect(master);
+    edgeRain = createPositionalAmbience(ctx, rainLP, master);
     windBP = ctx.createBiquadFilter(); windBP.type = 'bandpass'; windBP.frequency.value = 380; windBP.Q.value = .8; windG = ctx.createGain(); windG.gain.value = 0;
     loop().connect(windBP); windBP.connect(windG); windG.connect(master);
     const ro = ctx.createOscillator(); ro.frequency.value = 44; rumbleG = ctx.createGain(); rumbleG.gain.value = 0; ro.connect(rumbleG); rumbleG.connect(master); ro.start(); }
   function env(g, t, a, peak, rel){ g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + rel); }
   return {
     init, get on(){ return !!ctx; },
-    vol(v){ if (master) master.gain.value = v; },
+    vol(v){ if (master) master.gain.setTargetAtTime(v, ctx.currentTime, .05); },
     note(){ if (!ctx) return; const f = SCALE[TUNE[G.noteI++%TUNE.length]], t = ctx.currentTime;
       const o = ctx.createOscillator(), o2 = ctx.createOscillator(), g = ctx.createGain(), g2 = ctx.createGain(), lfo = ctx.createOscillator(), lg = ctx.createGain();
       o.type = 'sine'; o.frequency.value = f; o2.type = 'triangle'; o2.frequency.value = f*2; g2.gain.value = .12;
@@ -587,7 +591,13 @@ const sfx = (() => {
     bell(){ if (!ctx) return; const t = ctx.currentTime; for (const [f, v] of [[880, .12], [1326, .06], [2210, .03]]){ const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = f; o.connect(g); g.connect(master); env(g, t, .005, v, 1.8); o.start(t); o.stop(t + 2); } },
     gust(){ if (!ctx) return; const t = ctx.currentTime; windG.gain.cancelScheduledValues(t); windG.gain.setValueAtTime(windG.gain.value, t); windG.gain.linearRampToValueAtTime(.32, t + .4); windG.gain.linearRampToValueAtTime(.06*G.storm, t + 1.8);
       windBP.frequency.setValueAtTime(300, t); windBP.frequency.linearRampToValueAtTime(700, t + .6); windBP.frequency.linearRampToValueAtTime(320, t + 1.8); },
-    tick(){ if (!ctx) return; const under = G.holdingHill ? 1 : 0; rainG.gain.value = .16*G.storm*(G.beat === 'end' ? 0 : 1); rainLP.frequency.value = under ? 900 : 6000;
+    tick(){ if (!ctx) return; const under = G.holdingHill && hillRho() < 1;
+      const easing = G.beat === 'relent' ? clamp(1 - G.relentT/3) : G.beat === 'end' ? 0 : 1;
+      const rain = G.storm * easing;
+      rainG.gain.setTargetAtTime(rain*(under ? .04 : .16), ctx.currentTime, .15);
+      rainLP.frequency.setTargetAtTime(under ? 1250 : 6000, ctx.currentTime, .2);
+      const edge = hillNear();
+      edgeRain(edge.x, edge.z, player, G.holdingHill ? rain*.13 : 0, 21);
       rumbleG.gain.value = G.beat === 'lift' && inp.hold ? .18 : (G.beat === 'lower' && inp.hold ? .12 : 0); },
   };
 })();
@@ -626,7 +636,7 @@ const dlgEl = $('dlg');
 function dialog(n, lines, done){ G.dlg = { n, lines, i: 0, done }; dlgEl.style.display = 'block'; showLine(); progress(); }
 function showLine(){ const [who, text] = G.dlg.lines[G.dlg.i], you = who === 'you';
   $('dlgWho').textContent = you ? 'Kanha (you)' : who; $('dlgWho').className = 'who' + (you ? ' you' : ''); $('dlgLine').textContent = text; festivalAudio.narrateDialogue(G.dlg.lines, G.dlg.i); }
-function advance(){ if (!G.dlg) return; festivalAudio.stopVoice(); G.dlg.i++; if (G.dlg.i >= G.dlg.lines.length){ const f = G.dlg.done; G.dlg = null; dlgEl.style.display = 'none'; if (f) f(); } else showLine(); }
+function advance(){ if (!G.dlg) return; festivalAudio.stopDialogue(); G.dlg.i++; if (G.dlg.i >= G.dlg.lines.length){ const f = G.dlg.done; G.dlg = null; dlgEl.style.display = 'none'; if (f) f(); } else showLine(); }
 
 /* ---------------- the story, beat by beat ---------------- */
 const Y = 'you';
@@ -762,7 +772,8 @@ $('again').onclick = () => { location.hash = ''; location.reload(); };
 $('stay').onclick = () => { $('end').hidden = true; G.ended = false; grab(); };
 $('begin').onclick = () => { $('title').hidden = true; G.started = true; sfx.init(); festivalAudio.start(); grab(); };
 $('sWob').oninput = e => SET.wob = +e.target.value; $('sGrain').oninput = e => SET.grain = +e.target.value;
-$('sSens').oninput = e => SET.sens = +e.target.value; $('sVol').oninput = e => { SET.vol = +e.target.value; sfx.vol(SET.vol); festivalAudio.setVolume(SET.vol); };
+$('sSens').oninput = e => SET.sens = +e.target.value;
+festivalAudio.bindEffects(sfx.vol);
 
 /* ---------------- simulation ---------------- */
 const BALANCE_BEATS = ['balance', 'days'];
@@ -1031,7 +1042,8 @@ function hud(){
 
 /* ---------------- main loop ---------------- */
 let lastT = performance.now();
-function frame(now){ festivalAudio.tick(!!G.dlg); const dt = Math.min(.05, Math.max(0, (now - lastT)/1000)); lastT = now;
+function frame(now){ const dt = Math.min(.05, Math.max(0, (now - lastT)/1000)); lastT = now;
+  festivalAudio.tick(!!G.dlg, dt);
   if (!G.selftestRunning){ update(dt); cameraStep(dt); render(); }
   requestAnimationFrame(frame); }
 

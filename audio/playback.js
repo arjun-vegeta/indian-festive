@@ -33,16 +33,85 @@ const createFestivalAudio = (() => {
     },
   };
 
+  const defaults = { voice: .7, music: .7, effects: .7 };
+  const storageKey = 'festive.audio';
+
+  function loadLevels() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(storageKey));
+      return Object.fromEntries(Object.entries(defaults).map(([channel, fallback]) => {
+        const value = saved?.[channel];
+        return [channel, Number.isFinite(value) && value >= 0 && value <= 1 ? value : fallback];
+      }));
+    } catch (error) {
+      console.warn('Festival audio settings could not be read', error);
+      return { ...defaults };
+    }
+  }
+
   return function createFestivalAudio(scene) {
     const track = tracks[scene];
     const credit = document.getElementById('musicCredit');
     credit.href = track.link;
     credit.textContent = `${track.title} · ${track.artist} · Apple Music`;
 
-    let music, voice, voiceCue;
-    let started = false, paused = false, musicActive = false, quiet = false;
-    let volume = .7, playAttempt = 0;
-    const canPlay = () => started && !paused && !document.hidden && volume > 0;
+    const levels = loadLevels();
+    const replay = document.getElementById('replayLine');
+    let music, voice, voiceCue, lineCue, updateEffects;
+    let started = false, paused = false, musicActive = false;
+    let duck = 1, playAttempt = 0;
+    const canPlay = channel => started && !paused && !document.hidden && levels[channel] > 0;
+    const effectsVolume = () => paused || document.hidden ? 0 : levels.effects;
+
+    function refreshReplay() {
+      replay.hidden = !lineCue;
+      replay.disabled = !canPlay('voice');
+    }
+
+    function replayLine() {
+      if (lineCue && canPlay('voice')) narrate(lineCue);
+    }
+
+    function bindEffects(onLevel) {
+      updateEffects = onLevel;
+      updateEffects(effectsVolume());
+    }
+
+    function setLevel(channel, value) {
+      const wasMuted = levels[channel] === 0;
+      levels[channel] = value;
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(levels));
+      } catch (error) {
+        console.warn('Festival audio settings could not be saved', error);
+      }
+      if (channel === 'effects') updateEffects?.(effectsVolume());
+      if (channel === 'voice') {
+        if (value === 0) stopVoice();
+        else if (voice) voice.volume = .8 * value;
+        refreshReplay();
+      }
+      if (channel === 'music') {
+        mix();
+        if (wasMuted !== (value === 0)) syncMusic();
+      }
+    }
+
+    for (const [channel, level] of Object.entries(levels)) {
+      const input = document.getElementById(channel + 'Volume');
+      input.value = level;
+      input.addEventListener('input', () => setLevel(channel, input.valueAsNumber));
+    }
+
+    replay.addEventListener('click', replayLine);
+    replay.addEventListener('keydown', event => {
+      if (event.code === 'Enter' || event.code === 'Space') event.stopPropagation();
+    });
+    document.addEventListener('keydown', event => {
+      if (event.code !== 'KeyR' || event.repeat || replay.hidden || replay.disabled) return;
+      event.preventDefault();
+      replayLine();
+    });
 
     function stopMusic() {
       musicActive = false;
@@ -59,14 +128,14 @@ const createFestivalAudio = (() => {
         return;
       }
       const fade = Math.min(1, time / 1.6, (duration - time) / 2.4);
-      const level = volume * .16 * fade * (voice ? .22 : quiet ? .4 : 1);
+      const level = levels.music * .16 * fade * duck;
       if (Math.abs(music.volume - level) > .001) music.volume = level;
     }
 
     function syncMusic() {
       if (!musicActive) return;
       const attempt = ++playAttempt;
-      if (!canPlay()) {
+      if (!canPlay('music')) {
         music.pause();
         return;
       }
@@ -80,7 +149,7 @@ const createFestivalAudio = (() => {
     }
 
     function musicCue() {
-      if (!canPlay() || musicActive) return;
+      if (!canPlay('music') || musicActive) return;
       if (!music) {
         music = new Audio(track.preview);
         music.addEventListener('ended', stopMusic);
@@ -99,12 +168,15 @@ const createFestivalAudio = (() => {
     function start() {
       if (started) return;
       started = true;
+      refreshReplay();
       musicCue();
     }
 
-    function tick(dialogueOpen) {
-      quiet = dialogueOpen;
-      if (canPlay()) mix();
+    function tick(dialogueOpen, dt) {
+      const target = voice ? .22 : dialogueOpen ? .4 : 1;
+      const timeConstant = target < duck ? .07 : .38;
+      duck += (target - duck) * (1 - Math.exp(-dt / timeConstant));
+      if (canPlay('music')) mix();
     }
 
     function stopVoice() {
@@ -117,10 +189,10 @@ const createFestivalAudio = (() => {
 
     function narrate(cue) {
       const clip = festivalNarration[cue];
-      if (!clip || !canPlay()) return;
+      if (!clip || !canPlay('voice')) return;
       stopVoice();
       const audio = new Audio(new URL(clip, audioRoot).href);
-      audio.volume = .8 * volume;
+      audio.volume = .8 * levels.voice;
       voice = audio;
       voiceCue = cue;
       mix();
@@ -132,18 +204,27 @@ const createFestivalAudio = (() => {
 
     function narrateDialogue(lines, index) {
       const conversation = conversations.get(lines);
-      if (conversation) narrate(`${conversation}-${index + 1}`);
+      const cue = conversation && `${conversation}-${index + 1}`;
+      lineCue = cue && festivalNarration[cue] ? cue : undefined;
+      refreshReplay();
+      if (lineCue) narrate(lineCue);
+    }
+
+    function stopDialogue() {
+      lineCue = undefined;
+      refreshReplay();
+      stopVoice();
     }
 
     function syncVoice() {
       const audio = voice;
       if (!audio) return;
-      if (!canPlay()) {
+      if (!canPlay('voice')) {
         audio.pause();
         return;
       }
       audio.play().catch(error => {
-        if (voice !== audio || !canPlay() || error.name === 'AbortError') return;
+        if (voice !== audio || !canPlay('voice') || error.name === 'AbortError') return;
         console.warn(`Festival narration could not play (${voiceCue})`, error);
         stopVoice();
       });
@@ -153,28 +234,43 @@ const createFestivalAudio = (() => {
       paused = on;
       syncVoice();
       syncMusic();
-    }
-
-    function setVolume(value) {
-      const wasMuted = volume === 0;
-      volume = value;
-      if (value === 0) stopVoice();
-      else if (voice) voice.volume = .8 * value;
-      mix();
-      if (wasMuted !== (value === 0)) syncMusic();
+      updateEffects?.(effectsVolume());
+      refreshReplay();
     }
 
     function stop() {
       started = false;
       stopMusic();
-      stopVoice();
+      stopDialogue();
     }
 
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) stopVoice();
       syncMusic();
+      updateEffects?.(effectsVolume());
+      refreshReplay();
     });
     addEventListener('pagehide', stop);
-    return { start, stop, pause, tick, musicCue, narrate, narrateDialogue, stopVoice, setVolume };
+    refreshReplay();
+    return { start, stop, pause, tick, musicCue, narrate, narrateDialogue, stopDialogue, bindEffects, effectsVolume };
   };
 })();
+
+function createPositionalAmbience(context, input, output) {
+  const gain = context.createGain();
+  gain.gain.value = 0;
+  const panner = context.createStereoPanner();
+  input.connect(gain);
+  gain.connect(panner);
+  panner.connect(output);
+  return (sourceX, sourceZ, player, level, radius) => {
+    const dx = sourceX - player.pos.x;
+    const dz = sourceZ - player.pos.y;
+    const distance = Math.hypot(dx, dz);
+    const pan = (dx * Math.cos(player.yaw) - dz * Math.sin(player.yaw)) / Math.max(distance, 3);
+    const attenuation = Math.max(0, 1 - distance / radius) ** 2;
+    const time = context.currentTime;
+    panner.pan.setTargetAtTime(pan, time, .15);
+    gain.gain.setTargetAtTime(level * attenuation, time, .18);
+  };
+}

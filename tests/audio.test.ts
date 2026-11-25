@@ -49,13 +49,18 @@ test('Sarvam generation fails visibly on missing credentials, provider failure, 
 
 const dialogueSource = readFileSync(new URL('../audio/dialogue.js', import.meta.url), 'utf8');
 const source = readFileSync(new URL('../audio/playback.js', import.meta.url), 'utf8');
-function setupPlayback() {
+function setupPlayback(storage = new Map<string, string>(), scene = "hub") {
   const media: FakeAudio[] = [];
   const credit = { href: '', textContent: '' };
+  const replay = Object.assign(new EventTarget(), { hidden: true, disabled: false });
+  const sliders = Object.fromEntries(['voice', 'music', 'effects'].map(channel => [
+    channel + 'Volume', Object.assign(new EventTarget(), { value: 0, valueAsNumber: 0 }),
+  ]));
+  const elements: Record<string, unknown> = { musicCredit: credit, replayLine: replay, ...sliders };
   const document = Object.assign(new EventTarget(), {
     hidden: false,
     currentScript: { src: 'file:///festival/audio/playback.js' },
-    getElementById: (id: string) => id === 'musicCredit' ? credit : null,
+    getElementById: (id: string) => elements[id],
   });
   class FakeAudio extends EventTarget {
     volume = 1;
@@ -72,16 +77,23 @@ function setupPlayback() {
     pause() { this.paused = true; }
   }
 
-  const scope = { document, URL, addEventListener() {}, Audio: FakeAudio, console,
+  const localStorage = { getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, value: string) => storage.set(key, value) };
+  const scope = { document, URL, addEventListener() {}, Audio: FakeAudio, console, localStorage, scene,
     festivalNarration: { 'dadiIntro-1': 'dadiIntro-1.mp3', 'dadiIntro-2': 'dadiIntro-2.mp3' } };
-  const { audio, lines } = runInNewContext(dialogueSource + '\n' + source +
-    "\n({ audio: createFestivalAudio('hub'), lines: festivalDialogue.dadiIntro });", scope);
-  return { audio, credit, document, lines, media };
+  const { audio, lines, createAmbience } = runInNewContext(dialogueSource + '\n' + source +
+    "\n({ audio: createFestivalAudio(scene), lines: festivalDialogue.dadiIntro, createAmbience: createPositionalAmbience });", scope);
+  function changeLevel(channel: string, value: number) {
+    const slider = sliders[channel + 'Volume'];
+    slider.valueAsNumber = value;
+    slider.dispatchEvent(new Event('input'));
+  }
+  return { audio, changeLevel, createAmbience, credit, document, lines, media, replay, sliders };
 }
 
 test('Apple preview starts with play, quiets during dialogue, and fades out without looping', () => {
   const { audio, credit, media } = setupPlayback();
-  audio.tick(false);
+  audio.tick(false, .05);
   assert.equal(media.length, 0);
   assert.deepEqual(credit, {
     href: 'https://music.apple.com/us/song/1767775461',
@@ -96,23 +108,25 @@ test('Apple preview starts with play, quiets during dialogue, and fades out with
   assert.equal(music.paused, false);
   assert.equal(music.volume, 0);
   music.currentTime = 3;
-  audio.tick(false);
+  audio.tick(false, .05);
   const normalVolume = .7 * .16;
   assert.equal(music.volume, normalVolume);
-  audio.tick(true);
-  assert.equal(music.volume, normalVolume * .4);
+  audio.tick(true, .05);
+  assert.ok(music.volume > normalVolume * .4 && music.volume < normalVolume);
+  audio.tick(true, 1);
+  assert.ok(Math.abs(music.volume - normalVolume * .4) < .001);
   audio.pause(true);
   assert.equal(music.paused, true);
   audio.pause(false);
   assert.equal(music.paused, false);
   assert.equal(music.currentTime, 3);
   music.currentTime = 13;
-  audio.tick(false);
+  audio.tick(false, .05);
   assert.ok(music.volume < normalVolume / 2);
   music.currentTime = 14;
-  audio.tick(false);
+  audio.tick(false, .05);
   assert.equal(music.paused, true);
-  audio.tick(false);
+  audio.tick(false, .05);
   assert.equal(music.currentTime, 14);
   audio.musicCue();
   assert.equal(media.length, 1);
@@ -122,49 +136,44 @@ test('Apple preview starts with play, quiets during dialogue, and fades out with
   assert.equal(music.paused, true);
 });
 
-test('narration ducks music and releases it on ending, advancing, hiding, and muting', () => {
-  const { audio, document, lines, media } = setupPlayback();
+test('narration ducks music with a gradual attack and release', () => {
+  const { audio, changeLevel, document, lines, media, replay } = setupPlayback();
   audio.narrateDialogue(lines, 0);
   assert.equal(media.length, 0);
   audio.start();
   const [music] = media;
   music.currentTime = 3;
-  audio.narrate('unknown');
-  assert.equal(media.length, 1);
+  audio.tick(false, .05);
+  const normalVolume = music.volume;
   audio.narrateDialogue(lines, 0);
   assert.equal(media[1].src, 'file:///festival/audio/dadiIntro-1.mp3');
   assert.equal(media[1].volume, .8 * .7);
-  const normalVolume = .7 * .16;
-  assert.equal(music.volume, normalVolume * .22);
+  assert.equal(music.volume, normalVolume);
+  audio.tick(true, .05);
+  assert.ok(music.volume < normalVolume && music.volume > normalVolume * .22);
+  audio.tick(true, 1);
+  assert.ok(Math.abs(music.volume - normalVolume * .22) < .001);
   media[1].dispatchEvent(new Event('ended'));
-  assert.equal(music.volume, normalVolume);
-  audio.narrateDialogue(lines, 0);
-  audio.stopVoice();
-  assert.equal(media[2].paused, true);
-  assert.equal(music.volume, normalVolume);
+  audio.tick(true, .05);
+  assert.ok(music.volume > normalVolume * .22 && music.volume < normalVolume * .4);
+  assert.equal(replay.hidden, false);
   audio.narrateDialogue(lines, 0);
   document.hidden = true;
   document.dispatchEvent(new Event('visibilitychange'));
-  assert.equal(media[3].paused, true);
+  assert.equal(media[2].paused, true);
   assert.equal(music.paused, true);
   document.hidden = false;
   document.dispatchEvent(new Event('visibilitychange'));
   assert.equal(music.paused, false);
+  changeLevel('voice', 0);
+  assert.equal(replay.disabled, true);
   audio.narrateDialogue(lines, 0);
-  audio.setVolume(.4);
-  assert.equal(media[4].volume, .8 * .4);
-  audio.setVolume(0);
-  assert.equal(media[4].paused, true);
-  assert.equal(music.paused, true);
-  audio.narrateDialogue(lines, 0);
-  assert.equal(media.length, 5);
-  audio.setVolume(.4);
+  assert.equal(media.length, 3);
   assert.equal(music.paused, false);
-  assert.equal(music.volume, .4 * .16);
 });
 
 test('a player reply replaces the preceding line and resumes after a pause', () => {
-  const { audio, lines, media } = setupPlayback();
+  const { audio, document, lines, media, replay } = setupPlayback();
   audio.start();
   audio.narrateDialogue(lines, 0);
   const [, dadi] = media;
@@ -178,10 +187,62 @@ test('a player reply replaces the preceding line and resumes after a pause', () 
   audio.pause(false);
   assert.equal(player.paused, false);
   assert.equal(player.currentTime, 1);
-  audio.stopVoice();
-  audio.narrateDialogue([['Villager', 'An unvoiced line']], 0);
+  replay.dispatchEvent(new Event('click'));
   assert.equal(player.paused, true);
-  assert.equal(media.length, 3);
+  assert.equal(media[3].src, player.src);
+  assert.equal(media[3].currentTime, 0);
+  const replayKey = Object.assign(new Event('keydown', { cancelable: true }), { code: 'KeyR' });
+  document.dispatchEvent(replayKey);
+  assert.equal(replayKey.defaultPrevented, true);
+  assert.equal(media[3].paused, true);
+  assert.equal(media[4].src, player.src);
+  audio.stopDialogue();
+  audio.narrateDialogue([['Villager', 'An unvoiced line']], 0);
+  assert.equal(media[4].paused, true);
+  assert.equal(replay.hidden, true);
+  assert.equal(media.length, 5);
+});
+
+test('mixer levels affect separate channels and carry into another island', () => {
+  const storage = new Map<string, string>();
+  const hub = setupPlayback(storage);
+  const effects: number[] = [];
+  hub.audio.bindEffects((value: number) => effects.push(value));
+  hub.audio.start();
+  hub.changeLevel('voice', .5);
+  hub.changeLevel('music', 0);
+  hub.changeLevel('effects', .25);
+  assert.equal(hub.media[0].paused, true);
+  hub.audio.narrateDialogue(hub.lines, 0);
+  assert.equal(hub.media[1].volume, .4);
+  assert.deepEqual(effects, [.7, .25]);
+  hub.audio.pause(true);
+  hub.audio.pause(false);
+  assert.deepEqual(effects, [.7, .25, 0, .25]);
+  const island = setupPlayback(storage, 'diwali');
+  assert.deepEqual(Object.values(island.sliders).map(slider => slider.value), [.5, 0, .25]);
+  island.audio.start();
+  assert.equal(island.media.length, 0);
+  assert.equal(island.audio.effectsVolume(), .25);
+});
+
+test('positional ambience pans with the player and attenuates with distance', () => {
+  const { createAmbience } = setupPlayback();
+  const levels: number[] = [];
+  const pans: number[] = [];
+  const context = {
+    currentTime: 0,
+    createGain: () => ({ connect() {}, gain: { value: 1, setTargetAtTime: (v: number) => levels.push(v) } }),
+    createStereoPanner: () => ({ connect() {}, pan: { setTargetAtTime: (v: number) => pans.push(v) } }),
+  };
+  const update = createAmbience(context, { connect() {} }, {});
+  const player = { pos: { x: 0, y: 0 }, yaw: 0 };
+  update(5, 0, player, .1, 10);
+  player.yaw = Math.PI;
+  update(5, 0, player, .1, 10);
+  update(10, 0, player, .1, 10);
+  assert.deepEqual(pans, [1, -1, -1]);
+  assert.deepEqual(levels, [.025, .025, 0]);
 });
 
 test('every authored narration cue has a shipped audio asset', () => {
