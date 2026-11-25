@@ -98,6 +98,7 @@
   #fatal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:30;padding:20px;text-align:center;font-size:18px}
   @media (max-width:700px){ #obj{font-size:14.5px;top:10px} #obj .k{display:none} .stat .v{font-size:22px} #dlg .line{font-size:17px} .sets{grid-template-columns:1fr} }
 </style>
+<meta name="govardhan-demo-environment" content="">
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
 </head>
 <body>
@@ -167,7 +168,11 @@
   </div>
 </div>
 <div id="test"></div>
-<div id="fatal"></div>
+<div id="fatal" role="alert" class="card"><div class="in">
+  <h2>Govardhan couldn’t open</h2>
+  <p class="sub" id="loadProblem"></p>
+  <p id="reportStatus" role="status"></p>
+</div></div>
 
 <script src="../audio/dialogue.js"></script>
 <script src="../audio/dialogue-hindi.js"></script>
@@ -175,7 +180,48 @@
 <script src="../audio/narration-hi.js"></script>
 <script src="../audio/playback.js"></script>
 <script type="module">
-import * as THREE from 'three';
+const demoEnvironment = document.querySelector('meta[name="govardhan-demo-environment"]').content;
+const demoFlag = 'govardhan_simulate_engine_failure';
+async function simulateLoadFailure() {
+  if (!demoEnvironment) return false;
+  try {
+    const response = await fetch('https://edge.api.flagsmith.com/api/v1/flags/', {
+      headers: { 'X-Environment-Key': demoEnvironment }, cache: 'no-store', signal: AbortSignal.timeout(2500)
+    });
+    if (!response.ok) throw new Error('Flag lookup failed');
+    const flags = await response.json();
+    return flags.some(flag => flag.feature.name === demoFlag && flag.enabled === true);
+  } catch {
+    console.warn('Govardhan demo flag unavailable. Loading the regular chapter.');
+    return false;
+  }
+}
+const simulated = await simulateLoadFailure();
+let THREE;
+try {
+  // The demo host deliberately returns 404 for this module. Both imports use the same error path.
+  THREE = simulated ? await import('./demo-unavailable-three.js') : await import('three');
+} catch (error) {
+  document.getElementById('fatal').style.display = 'flex';
+  document.getElementById('loadProblem').textContent = simulated
+    ? 'Demo simulation · The 3D engine failed to load.'
+    : 'The 3D engine failed to load.';
+  if (demoEnvironment) {
+    const status = document.getElementById('reportStatus');
+    status.textContent = 'Sending the load error to NudgeBee…';
+    try {
+      const response = await fetch('./load-report', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ simulated }), signal: AbortSignal.timeout(12000)
+      });
+      if (response.status !== 202) throw new Error('Report unavailable');
+      status.textContent = 'NudgeBee accepted the load report.';
+    } catch {
+      status.textContent = 'Report delivery to NudgeBee could not be confirmed.';
+    }
+  }
+  throw error;
+}
 THREE.ColorManagement.enabled = false;
 
 const $ = id => document.getElementById(id);
@@ -213,7 +259,7 @@ const mixHex = (a, b, t) => hv(a).lerp(hv(b), t);
 const canvas = $('c');
 let renderer;
 try { renderer = new THREE.WebGLRenderer({ canvas, antialias: false }); }
-catch (e) { $('fatal').style.display = 'flex'; $('fatal').textContent = 'This game needs WebGL, which this browser could not start.'; throw e; }
+catch (e) { $('fatal').style.display = 'flex'; $('loadProblem').textContent = 'This game needs WebGL, which this browser could not start.'; throw e; }
 renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(72, 1, .03, 600);

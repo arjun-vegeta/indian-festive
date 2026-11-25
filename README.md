@@ -157,3 +157,14 @@ Hash states like `#overview`, `#album=holi-prahlad`, `#fire` or `#dahan` jump st
 ## AI tools
 
 Built with Claude Code. The mythology and festival details are listed in each `NOTES.md` for a practising family to check.
+
+## Record the NudgeBee loading incident
+
+Use the deployed Govardhan chapter as the healthy comparison. For the recording, the local demo server serves the same chapter and reads its simulation flag from the Flagsmith environment you choose. A plain static copy skips the simulation. The courtyard flags keep their existing configuration.
+
+1. In Flagsmith, create the Boolean flag `govardhan_simulate_engine_failure`, disabled by default. Enable it in your demo environment. The demo uses the existing public client key in `FLAGSMITH_API_KEY`. Set `FLAGSMITH_DEMO_ENVIRONMENT_KEY` only to select another environment.
+2. For the event-only demo, set `NUDGEBEE_EVENT_WEBHOOK_URL` to the generated Event Webhook URL. For a workflow demo instead, leave that variable unset. In NudgeBee, create an Automation Webhook, link it to a workflow’s Webhook trigger, save and activate the workflow, and copy its generated URL into `NUDGEBEE_WEBHOOK_URL` in the same file. The local server holds this secret. [Automation Webhook setup](https://docs.nudgebee.com/docs/integrations/Webhooks/automation_webhook/)
+3. Run `node --env-file=.env demo/govardhan.mjs` (Node 22+) from the repo root. Open [local Govardhan](http://127.0.0.1:4173/govardhan-fpv/). Every new page load reads the flag. When enabled, the browser requests a deliberately missing engine module, displays a persistent error, and sends one report automatically. When disabled or when Flagsmith is unreachable, the chapter loads normally.
+4. Record the playable deployed chapter, the local error, then the corresponding run in NudgeBee’s history. The webhook payload includes the chapter, timestamp, simulation marker and failed module. A delivery acknowledgement in the game means the webhook accepted the report. Use the workflow history to see what ran.
+
+For independent verification, configure a workflow step to run a WebGL-capable browser against the **public deployed** `govardhan-fpv/index.html#selftest` URL. Wait for the page title to become `SELFTEST PASS` or `SELFTEST FAIL` and pass the observed result to the summary step together with the webhook payload. Report a probe timeout as inconclusive. A successful HTTP fetch of the HTML alone cannot verify that the chapter rendered.
