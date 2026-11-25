@@ -6,11 +6,7 @@ Built at Festive Hacks 2026 (WeMakeDevs × WeAreDevelopers, Bengaluru). Everythi
 
 ## Why we built this
 
-Many of us grew up celebrating these festivals without ever being told why. Ask a Gen Z or millennial why we burn Ravana on Dussehra, light diyas on the darkest night of Diwali, or shape a little hill for Govardhan Puja, and many can't say. Those stories used to come from grandparents, and fewer families get that time now.
-
-Festive Islands lets you play the story instead of reading it. You become Rama, Krishna, Durga, Prahlad or Ganesha, and every island ends by showing how families celebrate the festival today and why. Dadi's photo album ties your own family's festival photos to the story behind each one.
-
-It's made for kids first: short lines instead of walls of text, no score or timer on any puja, no way to fail, and hints that step in when you're stuck. Parents and grandparents can play it alongside them.
+Many Gen Z and millennials celebrate these festivals without knowing the stories behind them or why we do the rituals, and kids rarely get to hear them now. Here you play each story as its hero, then see how families celebrate it today. Made for kids first: no scores, no way to fail, and hints when you're stuck.
 
 ![Festive Islands from above](shots/01-overview.jpg)
 
