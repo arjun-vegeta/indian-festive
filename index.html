@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Festival Islands</title>
+<meta name="flagsmith-environment" content="aEMW3M4mEtrH9sZ8foMP3v">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&display=swap" rel="stylesheet">
@@ -166,6 +167,7 @@
 <div id="test"></div>
 <div id="fatal"></div>
 
+<script src="courtyard-flags.js"></script>
 <script type="module">
 import * as THREE from 'three';
 THREE.ColorManagement.enabled = false;
@@ -478,6 +480,8 @@ for (const k in DEF) ISL[k] = island({ ...DEF[k], name: k });
 
 // ---- home: the boy's aangan ----
 const DADI = {};
+const stool = new THREE.Group(), flowers = new THREE.Group(), garlandCue = new THREE.Group();
+const hungFlowers = new THREE.Group(), petals = [];
 { const I = ISL.home;
   addProp(I, hut(1, angOf(5.5, -4.5)), -5.5, 4.5, 0, 2.35);
   addProp(I, neem(.9), 5.6, 5.8, 0, .5);
@@ -507,9 +511,126 @@ const DADI = {};
   addProp(I, cp, cpx, cpz, face); I.coll.push({ x: cpx + Math.sin(face)*.0 + Math.cos(face)*.6, z: cpz - Math.sin(face)*.6, r: .62 }, { x: cpx - Math.cos(face)*.6, z: cpz + Math.sin(face)*.6, r: .62 });
   DADI.g = dg; DADI.name = 'Dadi';
   DADI.anchor = () => { const v = new V3(); DADI.head.getWorldPosition(v); return v.add(new V3(0, .45, 0)); };
+  // One strand lies flat on the stool, then hangs in a U on the front of the charpai.
+  addProp(I, stool, .45, 4.15, -.32, .64);
+  stool.add(at(mk(new THREE.BoxGeometry(1.4, .11, .94), BARK), 0, .54, 0));
+  for (const x of [-.53, .53]) for (const z of [-.32, .32])
+    rod(stool, new V3(x*1.07, .01, z*1.12), new V3(x, .51, z), .065, BARK);
+  const blossom = new THREE.SphereGeometry(.097, 16, 8);
+  const vertices = blossom.attributes.position;
+  for (let i = 0; i < vertices.count; i++) {
+    const r = 1 + .16*Math.cos((i%17)*PI + .8*Math.floor(i/17));
+    vertices.setXYZ(i, vertices.getX(i)*r, vertices.getY(i)*r, vertices.getZ(i)*r);
+  }
+  blossom.computeVertexNormals();
+  for (let i = 0; i <= 16; i++) {
+    const t = i/16, flower = mk(blossom, i%4 === 0 ? GOLD : MARIGOLD, { noShadow: true });
+    flowers.add(at(flower, 1.14*(t-.5), -.48*Math.sin(PI*t), 0));
+    flower.rotation.z = i*1.3;
+  }
+  for (const side of [-1, 1]) {
+    const leaf = mk(ellG(.065, .14, .035, 7, 5), LEAF, { noShadow: true });
+    leaf.rotation.z = -side*.75;
+    flowers.add(at(leaf, side*.62, .07, 0));
+  }
+  flowers.rotation.x = -PI/2;
+  flowers.position.set(0, .67, -.25);
+  stool.add(flowers, garlandCue);
+  hungFlowers.position.set(0, h + .04, W + .075);
+  hungFlowers.scale.set(1.52, .72, 1);
+  cp.add(hungFlowers);
+  for (const [radius, height, colour] of [[1.17, .009, POOL], [.91, .013, '#ffe9a0']]) {
+    const disc = mk(new THREE.CircleGeometry(radius, 32).rotateX(-PI/2), flatP(colour), { layer: 1, emis: 1, noShadow: true });
+    garlandCue.add(at(disc, 0, height, 0));
+  }
+  for (let i = 0; i < 10; i++) {
+    const petal = mk(ellG(.066, .105, .024, 7, 5), i%3 ? MARIGOLD : GOLD, { emis: 1, noShadow: true });
+    garlandCue.add(petal); petals.push(petal);
+  }
+  garlandCue.visible = false;
   // pots by the hut, and the family calf
   pot(I.props, -3.1, 0, 6.1, 1); pot(I.props, -2.6, 0, 6.6, .8, MUD); pot(I.props, -3.4, 0, 6.8, .7);
   addProp(I, cowMesh(COWB, true), -7.6, -1.6, 1.1, .7);
+}
+// A striped cloth shamiana above the charpai. Its open front frames Dadi from the home spawn.
+function addCourtyardCanopy(){
+  const canopy = new THREE.Group(), halfWidth = 2.75, eave = 2.55;
+  canopy.name = 'Festival canopy';
+  addProp(ISL.home, canopy, 2.48, 2.95, -.60);
+  const sections = [[.70, eave], [-.27, 2.76], [-.72, 3.23], [-1.23, 2.79], [-2.22, eave]];
+  for (const x of [-halfWidth, halfWidth]) for (const [z] of [sections[0], sections.at(-1)]) {
+    rod(canopy, new V3(x, 0, z), new V3(x, eave + .12, z), .046, BARK);
+    for (const y of [.16, eave - .1]) rod(canopy, new V3(x, y, z), new V3(x, y + .085, z), .06, GOLD);
+    const post = canopy.localToWorld(new V3(x, 0, z));
+    ISL.home.coll.push({ x: post.x, z: post.z, r: .15 });
+  }
+  const stripes = [TOMATO, MARIGOLD, WHITE, TEAL, WHITE, MARIGOLD, TOMATO];
+  for (let i = 0; i < stripes.length; i++) {
+    const left = lerp(-halfWidth, halfWidth, i/stripes.length);
+    const right = lerp(-halfWidth, halfWidth, (i+1)/stripes.length);
+    const sag = x => .19*(1-(x/halfWidth)**2);
+    const vertices = [], indices = [];
+    for (const [z, y] of sections) {
+      vertices.push(left, y-sag(left), z, right, y-sag(right), z);
+      const end = vertices.length/3;
+      if (end > 2) indices.push(end-4, end-3, end-2, end-2, end-3, end-1);
+    }
+    const roof = new THREE.BufferGeometry();
+    roof.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    roof.setIndex(indices); roof.computeVertexNormals();
+    canopy.add(mk(roof, stripes[i], { noShadow: true }));
+    const yl = eave - sag(left), yr = eave - sag(right), mid = (left+right)/2;
+    const hem = new THREE.Shape();
+    hem.moveTo(left, yl); hem.lineTo(right, yr); hem.lineTo(right, yr-.15);
+    hem.quadraticCurveTo(mid, (yl+yr)/2-.69, left, yl-.15); hem.closePath();
+    canopy.add(at(mk(new THREE.ShapeGeometry(hem, 12), stripes[i], { noShadow: true }), 0, 0, sections[0][0]));
+    const tasselY = (yl+yr)/2-.42;
+    const motif = new THREE.Shape([new V2(mid, tasselY+.12), new V2(mid+.11, tasselY+.21),
+      new V2(mid, tasselY+.31), new V2(mid-.11, tasselY+.21)]);
+    canopy.add(at(mk(new THREE.ShapeGeometry(motif), i===2 || i===4 ? TEAL : GOLD, { noShadow: true }), 0, 0, sections[0][0]+.009));
+    ball(canopy, new V3(mid, tasselY-.025, sections[0][0]), .055, GOLD, { noShadow: true });
+  }
+}
+
+// Group the powder shapes by colour so the entire path takes only a handful of draws.
+function addRangoliPath(){
+  const path = new THREE.Group(), layers = new Map();
+  path.name = 'Rangoli path';
+  addProp(ISL.home, path, -.5, 7.4, -.60);
+  function paint(colour, points){
+    if (!layers.has(colour)) layers.set(colour, []);
+    layers.get(colour).push(new THREE.Shape(points.map(([x,z]) => new V2(x, -z))));
+  }
+  function disc(colour, x, z, radius){
+    paint(colour, Array.from({length: 32}, (_, i) => {
+      const a = TAU*i/32;
+      return [x + radius*Math.cos(a), z + radius*Math.sin(a)];
+    }));
+  }
+  const rice = '#fff3cf', sindoor = '#bd4054', peacock = '#167e84', pink = '#ff8096', turmeric = '#ffc54e';
+  for (const [x, z, radius] of [[.16,-2.38,.96], [.25,-4.03,.64], [.26,-5.12,.39]]) {
+    const rim = Array.from({length: 96}, (_, i) => {
+      const a = TAU*i/96, r = radius*(.9+.1*Math.cos(a*8));
+      return [x+r*Math.sin(a), z+r*Math.cos(a)];
+    });
+    paint(rice, rim);
+    paint(sindoor, rim.map(([px,pz]) => [lerp(x,px,.93),lerp(z,pz,.93)]));
+    disc(peacock,x,z,radius*.69);
+    for (let i=0; i<8; i++) {
+      const a = TAU*i/8;
+      const petal = [[0,.80],[.105,.63],[.14,.47],[.09,.32],[0,.24],[-.09,.32],[-.14,.47],[-.105,.63]];
+      paint(i%2 ? turmeric : pink, petal.map(([u,v]) => [
+        x+radius*(u*Math.cos(a)+v*Math.sin(a)), z+radius*(v*Math.cos(a)-u*Math.sin(a))]));
+    }
+    // A separate colour keeps the centre above the petals in the paint order.
+    disc('#fff8df',x,z,radius*.23); disc('#e98b25',x,z,radius*.14);
+  }
+  let y = .024;
+  for (const [colour, shapes] of layers){
+    const geo = new THREE.ShapeGeometry(shapes).rotateX(-PI/2);
+    path.add(at(mk(geo, flatP(colour), { layer: 1, emis: 1, noShadow: true }), 0, y, 0));
+    y += .0015;
+  }
 }
 // ---- story islands: a torana at the landing, then a small preview of the story's world ----
 const GATES = {};
@@ -884,7 +1005,22 @@ const ALL_DONE = [['Dadi', 'You walked all three stories, beta. Dussehra, Diwali
 const ALL_BUBBLE = 'All three stories! The other islands are still being drawn.';
 function dadiLines(){ if (DONE.length === ORDER.length) return ALL_DONE; if (G.lastDone && DONE.includes(G.lastDone)) return DONE_LINES[G.lastDone];
   const n = nextStory(); return [['Dadi', `Next is ${STORY[n].fest}: ${STORY[n].story}. Follow the glowing stones, beta.`]]; }
-function talkDadi(){ if (!G.introDone){ dialog(DADI, INTRO, () => { G.introDone = true; refreshObjective(); }); return; } dialog(DADI, dadiLines(), null); }
+function pickUpGarland(){
+  if (flowers.parent !== stool) return;
+  hungFlowers.add(flowers);
+  flowers.position.set(0, 0, 0);
+  flowers.rotation.set(0, 0, 0);
+  garlandCue.visible = false;
+  courtyardFlags.choose('garland_picked_up');
+  sfx.chime(); say(DADI, 'Marigolds for my charpai! Thank you, beta.', 3.5);
+}
+function enterCourtyard(){
+  const appearance = courtyardFlags.enter();
+  garlandCue.visible = appearance.garland === 'glow' && flowers.parent === stool;
+  if (appearance.canopy && !ISL.home.props.getObjectByName('Festival canopy')) addCourtyardCanopy();
+  if (appearance.rangoli && !ISL.home.props.getObjectByName('Rangoli path')) addRangoliPath();
+}
+function talkDadi(){ courtyardFlags.choose('dadi_spoken_to'); if (!G.introDone){ dialog(DADI, INTRO, () => { G.introDone = true; refreshObjective(); }); return; } dialog(DADI, dadiLines(), null); }
 const dadiWorld = () => { const v = new V3(); DADI.g.getWorldPosition(v); return v; };
 const yawTo = p => Math.atan2(-(p.x - player.pos.x), -(p.z - player.pos.y));
 const islandOf = id => ISL[STORY[id].isl];
@@ -916,6 +1052,7 @@ function enterStory(id){ if (G.leaving) return; const s = STORY[id]; sfx.chime()
 
 /* ---------------- interaction targets ---------------- */
 function targets(){ const T = [];
+  if (flowers.parent === stool) T.push({ obj: flowers, pos: flowers.getWorldPosition(new V3()), label: 'Pick up the marigold garland', use: pickUpGarland, r: 2.4 });
   const dw = dadiWorld(); T.push({ obj: DADI.g, pos: dw, label: 'Talk to Dadi', use: talkDadi, r: 3.2 });
   for (const id of ORDER){ const s = STORY[id]; T.push({ obj: GATES[id].g, pos: GATES[id].world(), label: (DONE.includes(id) ? 'Play again as ' : 'Become ') + s.hero, use: () => enterStory(id), gate: true }); }
   return T; }
@@ -963,12 +1100,18 @@ addEventListener('blur', () => { inp.f = inp.b = inp.l = inp.r = 0; dragging = f
 function pauseGame(on){ G.paused = on; $('pause').hidden = !on; if (on){ inp.f = inp.b = inp.l = inp.r = 0; if (locked) document.exitPointerLock(); } else grab(); }
 $('resume').onclick = () => pauseGame(false);
 $('forget').onclick = () => { DONE = []; saveDone(DONE); G.lastDone = null; G.from = 'home'; G.introDone = false; refreshObjective(); pauseGame(false); };
-$('begin').onclick = () => { $('title').hidden = true; G.started = true; sfx.init(); grab(); };
+$('begin').onclick = () => { enterCourtyard(); $('title').hidden = true; G.started = true; sfx.init(); grab(); };
 $('sWob').oninput = e => SET.wob = +e.target.value; $('sGrain').oninput = e => SET.grain = +e.target.value;
 $('sSens').oninput = e => SET.sens = +e.target.value; $('sVol').oninput = e => { SET.vol = +e.target.value; sfx.vol(SET.vol); };
 
 /* ---------------- simulation ---------------- */
 function animate(dt){
+  if (garlandCue.visible) petals.forEach((petal, i) => {
+    const t = (G.t*.36 + i/petals.length)%1, a = i*2.4 + t*2;
+    petal.position.set(Math.cos(a)*(.37 + .18*t), .77 + t*.92, Math.sin(a)*.4);
+    petal.rotation.set(t*3, a, Math.sin(a)*.8);
+    petal.scale.setScalar(Math.sin(PI*t));
+  });
   for (const I of ISLANDS){ I.g.position.y = I.baseY + I.amp*Math.sin(G.t*TAU/I.per + I.ph); I.smat.uniforms.uG.value = I.g.position.y;
     for (const r of I.rocks) r.position.y = r.userData.base.y + .3*Math.sin(G.t*.8 + r.userData.ph); }
   for (const S of STONES) S.g.position.y = S.baseY + S.amp*Math.sin(G.t*TAU/S.per + S.ph);
@@ -1113,16 +1256,16 @@ function frame(now){ const dt = Math.min(.05, Math.max(0, (now - lastT)/1000)); 
 
 /* ---------------- hash states ---------------- */
 function settle(sec){ const n = Math.round(sec*30); for (let i = 0; i < n; i++){ update(1/30); cameraStep(1/30); } }
-function applyHash(){
+async function applyHash(){
   const parts = location.hash.slice(1).split('&').filter(Boolean), kv = {}; let name = '';
   for (const p of parts){ const i = p.indexOf('='), k = i < 0 ? p : p.slice(0, i), v = i < 0 ? '' : decodeURIComponent(p.slice(i + 1)); kv[k] = v; if (!name && !['yaw', 'pitch', 'wob', 'from', 't', 'oa'].includes(k)) name = k; }
   if (kv.t) G.t = +kv.t; if (kv.oa) OV.a0 = +kv.oa;
   if (name === 'selftest'){ G.started = true; $('title').hidden = true; selftest(); return; }
   if (name === 'overview'){ G.started = true; G.mode = 'overview'; startHome(); G.mode = 'overview'; }
-  else if (name === 'home'){ G.started = true; startHome(); }
+  else if (name === 'home'){ await courtyardFlags.prepare(); startHome(); enterCourtyard(); G.started = true; }
   else if (name === 'gate' && STORY[kv.gate]){ G.started = true; atGate(kv.gate); }
   else if (name === 'done' && STORY[kv.done]){ G.started = true; arrive(kv.done); }
-  else { startHome(); $('title').hidden = false; }
+  else { await courtyardFlags.prepare(); startHome(); $('title').hidden = false; }
   if (kv.yaw !== undefined) player.yaw = +kv.yaw; if (kv.pitch !== undefined) player.pitch = +kv.pitch; if (kv.wob !== undefined) SET.wob = +kv.wob;
   settle(.05);
 }
@@ -1158,6 +1301,12 @@ function selftest(){
     for (const k in PATHS){ let gaps = 0; const nd = PATHS[k].nodes; for (let i = 0; i < nd.length - 1; i++) for (let s = 0; s <= 12; s++) if (onWalk(lerp(nd[i].x, nd[i + 1].x, s/12), lerp(nd[i].z, nd[i + 1].z, s/12)) === null) gaps++;
       ok(gaps === 0, `stones ${k}: ${PATHS[k].stones.length} stones, walkable end to end`); }
     ok(G.glowing.includes(DADI.g), 'Dadi glows first');
+    const garlandPos = flowers.getWorldPosition(new V3());
+    ok(walkTo(garlandPos.x, garlandPos.z + 1.35, .35), 'walked to the marigold stool');
+    face(garlandPos);
+    ok(focusTarget()?.obj === flowers && use() && flowers.parent === hungFlowers, 'E hangs the garland on the charpai');
+    ok(!garlandCue.visible && !targets().some(t => t.obj === flowers), 'the cue and pickup prompt clear after the gift');
+    startHome();
     const dw = dadiWorld(), df = new V3(0, 0, 1.5).applyQuaternion(DADI.g.getWorldQuaternion(new THREE.Quaternion()));
     ok(walkTo(dw.x + df.x, dw.z + df.z, .5), 'walked up to Dadi'); face(dw); ok(use() && G.dlg && G.dlg.lines === INTRO, 'E on Dadi starts her intro (' + INTRO.length + ' lines)');
     finishDlg(); ok(G.introDone && G.glowing.includes(GATES['dussehra-rama'].g), 'after the intro the stones and gate to Dussehra glow');
@@ -1196,7 +1345,7 @@ function selftest(){
 }
 
 window.HUB = { G, player, ISL, GATES, PATHS, STONES, SKETCHES, onWalk };
-applyHash(); cameraStep(1/30);
+await applyHash(); cameraStep(1/30);
 requestAnimationFrame(frame);
 </script>
 </body>
