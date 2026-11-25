@@ -36,16 +36,19 @@ const createFestivalAudio = (() => {
   const defaults = { voice: .7, music: .7, effects: .7 };
   const storageKey = 'festive.audio';
 
-  function loadLevels() {
+  const narration = { 'en-IN': festivalNarration, 'hi-IN': festivalNarrationHindi };
+
+  function loadSettings() {
     try {
       const saved = JSON.parse(localStorage.getItem(storageKey));
-      return Object.fromEntries(Object.entries(defaults).map(([channel, fallback]) => {
+      const levels = Object.fromEntries(Object.entries(defaults).map(([channel, fallback]) => {
         const value = saved?.[channel];
         return [channel, Number.isFinite(value) && value >= 0 && value <= 1 ? value : fallback];
       }));
+      return { levels, language: saved?.language === 'hi-IN' ? 'hi-IN' : 'en-IN' };
     } catch (error) {
       console.warn('Festival audio settings could not be read', error);
-      return { ...defaults };
+      return { levels: { ...defaults }, language: 'en-IN' };
     }
   }
 
@@ -55,21 +58,26 @@ const createFestivalAudio = (() => {
     credit.href = track.link;
     credit.textContent = `${track.title} · ${track.artist} · Apple Music`;
 
-    const levels = loadLevels();
+    const settings = loadSettings();
+    const { levels } = settings;
     const replay = document.getElementById('replayLine');
-    let music, voice, voiceCue, lineCue, updateEffects;
-    let started = false, paused = false, musicActive = false;
+    const subtitle = document.getElementById('dlgLine');
+    const languageSelect = document.getElementById('narrationLanguage');
+    let music, voice, voiceCue, line, updateEffects;
+    let started = false, paused = false, musicActive = false, replayOnResume = false;
     let duck = 1, playAttempt = 0;
     const canPlay = channel => started && !paused && !document.hidden && levels[channel] > 0;
     const effectsVolume = () => paused || document.hidden ? 0 : levels.effects;
 
+    const clipFor = cue => narration[settings.language][cue];
+
     function refreshReplay() {
-      replay.hidden = !lineCue;
+      replay.hidden = !line || !clipFor(line.cue);
       replay.disabled = !canPlay('voice');
     }
 
     function replayLine() {
-      if (lineCue && canPlay('voice')) narrate(lineCue);
+      if (line) narrate(line.cue);
     }
 
     function bindEffects(onLevel) {
@@ -77,14 +85,18 @@ const createFestivalAudio = (() => {
       updateEffects(effectsVolume());
     }
 
-    function setLevel(channel, value) {
-      const wasMuted = levels[channel] === 0;
-      levels[channel] = value;
+    function saveSettings() {
       try {
-        localStorage.setItem(storageKey, JSON.stringify(levels));
+        localStorage.setItem(storageKey, JSON.stringify({ ...levels, language: settings.language }));
       } catch (error) {
         console.warn('Festival audio settings could not be saved', error);
       }
+    }
+
+    function setLevel(channel, value) {
+      const wasMuted = levels[channel] === 0;
+      levels[channel] = value;
+      saveSettings();
       if (channel === 'effects') updateEffects?.(effectsVolume());
       if (channel === 'voice') {
         if (value === 0) stopVoice();
@@ -102,6 +114,21 @@ const createFestivalAudio = (() => {
       input.value = level;
       input.addEventListener('input', () => setLevel(channel, input.valueAsNumber));
     }
+
+    languageSelect.value = settings.language;
+    languageSelect.addEventListener('change', () => {
+      const language = languageSelect.value;
+      if (language === settings.language || !Object.hasOwn(narration, language)) return;
+      settings.language = language;
+      saveSettings();
+      stopVoice();
+      if (line) {
+        renderSubtitle(line.text, line.translation);
+        if (paused) replayOnResume = true;
+        else replayLine();
+      }
+      refreshReplay();
+    });
 
     replay.addEventListener('click', replayLine);
     replay.addEventListener('keydown', event => {
@@ -188,7 +215,7 @@ const createFestivalAudio = (() => {
     }
 
     function narrate(cue) {
-      const clip = festivalNarration[cue];
+      const clip = clipFor(cue);
       if (!clip || !canPlay('voice')) return;
       stopVoice();
       const audio = new Audio(new URL(clip, audioRoot).href);
@@ -202,16 +229,29 @@ const createFestivalAudio = (() => {
       syncVoice();
     }
 
+    function renderSubtitle(text, translation) {
+      const inHindi = settings.language === 'hi-IN' && !!translation;
+      subtitle.textContent = inHindi ? translation : text;
+      subtitle.lang = inHindi ? 'hi' : 'en';
+    }
+
     function narrateDialogue(lines, index) {
       const conversation = conversations.get(lines);
-      const cue = conversation && `${conversation}-${index + 1}`;
-      lineCue = cue && festivalNarration[cue] ? cue : undefined;
+      const text = lines[index][1];
+      const translation = festivalHindi.dialogue[conversation]?.[index];
+      line = conversation && { cue: `${conversation}-${index + 1}`, text, translation };
+      renderSubtitle(text, translation);
       refreshReplay();
-      if (lineCue) narrate(lineCue);
+      if (line) narrate(line.cue);
+    }
+
+    function transitionText(cue, english) {
+      return settings.language === 'hi-IN' ? festivalHindi.transitions[cue] : english;
     }
 
     function stopDialogue() {
-      lineCue = undefined;
+      line = undefined;
+      replayOnResume = false;
       refreshReplay();
       stopVoice();
     }
@@ -232,7 +272,10 @@ const createFestivalAudio = (() => {
 
     function pause(on) {
       paused = on;
-      syncVoice();
+      if (!on && replayOnResume) {
+        replayOnResume = false;
+        replayLine();
+      } else syncVoice();
       syncMusic();
       updateEffects?.(effectsVolume());
       refreshReplay();
@@ -252,7 +295,7 @@ const createFestivalAudio = (() => {
     });
     addEventListener('pagehide', stop);
     refreshReplay();
-    return { start, stop, pause, tick, musicCue, narrate, narrateDialogue, stopDialogue, bindEffects, effectsVolume };
+    return { start, stop, pause, tick, musicCue, narrate, narrateDialogue, transitionText, stopDialogue, bindEffects, effectsVolume };
   };
 })();
 

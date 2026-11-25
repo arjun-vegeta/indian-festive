@@ -90,6 +90,7 @@
   button.go{background:var(--accent);box-shadow:3px 3px 0 var(--ink)}
   button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
   .sets{display:grid;grid-template-columns:1fr 1fr;gap:10px 22px;border-top:1px solid var(--rule);padding-top:12px;margin:0 0 14px}
+  #narrationLanguage{font:inherit;width:100%;padding:2px 6px;color:var(--ink);background:var(--paper);border:1px solid var(--rule);border-radius:6px}
   .sets label{display:block;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:800;margin-bottom:2px}
   input[type=range]{width:100%;accent-color:var(--ink)}
   #test{position:fixed;left:12px;bottom:12px;z-index:20;background:var(--paper);border:2px solid var(--ink);border-radius:12px;box-shadow:4px 4px 0 var(--ink);
@@ -150,6 +151,7 @@
       <div><label for="voiceVolume">Voice</label><input id="voiceVolume" type="range" min="0" max="1" step="0.05" value="0.7"></div>
       <div><label for="musicVolume">Music</label><input id="musicVolume" type="range" min="0" max="1" step="0.05" value="0.7"></div>
       <div><label for="effectsVolume">Effects</label><input id="effectsVolume" type="range" min="0" max="1" step="0.05" value="0.7"></div>
+      <div><label for="narrationLanguage">Narration language</label><select id="narrationLanguage"><option value="en-IN">English</option><option value="hi-IN" lang="hi">हिन्दी</option></select></div>
     </div>
     <div class="row"><button id="restart">Start again</button><button class="go" id="resume">Resume</button></div>
   </div>
@@ -166,7 +168,9 @@
 <div id="fatal"></div>
 
 <script src="../audio/dialogue.js"></script>
+<script src="../audio/dialogue-hindi.js"></script>
 <script src="../audio/narration.js"></script>
+<script src="../audio/narration-hi.js"></script>
 <script src="../audio/playback.js"></script>
 <script type="module">
 import * as THREE from 'three';
@@ -634,8 +638,8 @@ function drawBubbles(){ const W = innerWidth, Hh = innerHeight, edgeY = { '-1': 
 // dialogue
 const dlgEl = $('dlg');
 function dialog(n, lines, done){ G.dlg = { n, lines, i: 0, done }; dlgEl.style.display = 'block'; showLine(); progress(); }
-function showLine(){ const [who, text] = G.dlg.lines[G.dlg.i], you = who === 'you';
-  $('dlgWho').textContent = you ? 'Kanha (you)' : who; $('dlgWho').className = 'who' + (you ? ' you' : ''); $('dlgLine').textContent = text; festivalAudio.narrateDialogue(G.dlg.lines, G.dlg.i); }
+function showLine(){ const [who] = G.dlg.lines[G.dlg.i], you = who === 'you';
+  $('dlgWho').textContent = you ? 'Kanha (you)' : who; $('dlgWho').className = 'who' + (you ? ' you' : ''); festivalAudio.narrateDialogue(G.dlg.lines, G.dlg.i); }
 function advance(){ if (!G.dlg) return; festivalAudio.stopDialogue(); G.dlg.i++; if (G.dlg.i >= G.dlg.lines.length){ const f = G.dlg.done; G.dlg = null; dlgEl.style.display = 'none'; if (f) f(); } else showLine(); }
 
 /* ---------------- the story, beat by beat ---------------- */
@@ -700,7 +704,7 @@ function startDays(){ G.beat = 'days'; G.day = 1; G.dayT = 0; G.dayLine = 0; G.n
   objective('Hold Govardhan steady while the storm rages', null, ['Each time the wind pushes the dot, move the mouse against it. The days only pass while the hill is steady.']);
   shelterDiyas.forEach((d, i) => { const a = (i + .5)/shelterDiyas.length*TAU + .3; d.position.set(hill.pos.x + Math.cos(a)*2.6, 0, hill.pos.z + Math.sin(a)*2.6); d.visible = true; }); }
 function startRelent(){ G.beat = 'relent'; festivalAudio.musicCue(); festivalAudio.narrate('govardhanClearing'); G.relentT = 0; G.gust = null; progress();
-  objective('The rain is stopping', null); say(NPC.nanda, 'The clouds are parting. Indra has seen that no one in Vraj was hurt.', 5);
+  objective('The rain is stopping', null); say(NPC.nanda, festivalAudio.transitionText('govardhanClearing', 'The clouds are parting. Indra has seen that no one in Vraj was hurt.'), 5);
   NPCS.forEach((n, i) => { n.mode = 'walk'; n.safe = false; const a = PI*.12 + (i/(NPCS.length - 1))*PI*.76, r = n.cow ? 7.5 : 4.6;
     n.target = new V2(ANNA.x + r*1.2*Math.cos(a), ANNA.y + 1 + r*Math.sin(a)); n.speed = n.cow ? 1.6 : 2; n.pose = 'down'; }); }
 function startLower(){ G.beat = 'lower'; G.lower = 0; G.hillFrom.copy(hill.pos); progress();

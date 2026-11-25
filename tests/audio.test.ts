@@ -35,6 +35,26 @@ test('Sarvam requests every selected line and transition as an MP3', async () =>
   assert.deepEqual(cues.get('nandaDebate-2'), { speaker: 'aayan', text: 'Baba, why do we worship Indra?' });
 });
 
+test('Hindi synthesis covers every English cue with the same voice and Hindi API language', async () => {
+  const english = narrationCues();
+  const hindi = narrationCues('hi-IN');
+  assert.deepEqual([...hindi.keys()], [...english.keys()]);
+  const requests: unknown[] = [];
+  const audio = Buffer.from([0xff, 0xfb, 0x90, 0x64]);
+  const clips = await synthesizeNarration('test-key', async (_url, options) => {
+    requests.push(JSON.parse(String(options?.body)));
+    return Response.json({ audios: [audio.toString('base64')] });
+  }, 'hi-IN');
+  for (const [id, cue] of hindi) {
+    assert.equal(cue.speaker, english.get(id)?.speaker, id);
+    assert.match(cue.text, /[\u0900-\u097f]/u, id);
+  }
+  assert.deepEqual(requests, [...hindi.values()].map(cue => ({
+    ...cue, language_code: 'hi-IN', model: 'bulbul:v3', output_audio_codec: 'mp3', pace: .92,
+  })));
+  assert.deepEqual([...clips.keys()], [...hindi.keys()]);
+});
+
 test('Sarvam generation fails visibly on missing credentials, provider failure, and invalid audio', async () => {
   await assert.rejects(synthesizeNarration(''), /Set SARVAM_API_KEY/);
   await assert.rejects(
@@ -48,6 +68,7 @@ test('Sarvam generation fails visibly on missing credentials, provider failure, 
 });
 
 const dialogueSource = readFileSync(new URL('../audio/dialogue.js', import.meta.url), 'utf8');
+const hindiSource = readFileSync(new URL('../audio/dialogue-hindi.js', import.meta.url), 'utf8');
 const source = readFileSync(new URL('../audio/playback.js', import.meta.url), 'utf8');
 function setupPlayback(storage = new Map<string, string>(), scene = "hub") {
   const media: FakeAudio[] = [];
@@ -56,7 +77,11 @@ function setupPlayback(storage = new Map<string, string>(), scene = "hub") {
   const sliders = Object.fromEntries(['voice', 'music', 'effects'].map(channel => [
     channel + 'Volume', Object.assign(new EventTarget(), { value: 0, valueAsNumber: 0 }),
   ]));
-  const elements: Record<string, unknown> = { musicCredit: credit, replayLine: replay, ...sliders };
+  const languageSelect = Object.assign(new EventTarget(), { value: '' });
+  const subtitle = { textContent: '', lang: '' };
+  const elements: Record<string, unknown> = {
+    musicCredit: credit, replayLine: replay, narrationLanguage: languageSelect, dlgLine: subtitle, ...sliders,
+  };
   const document = Object.assign(new EventTarget(), {
     hidden: false,
     currentScript: { src: 'file:///festival/audio/playback.js' },
@@ -80,15 +105,16 @@ function setupPlayback(storage = new Map<string, string>(), scene = "hub") {
   const localStorage = { getItem: (key: string) => storage.get(key) ?? null,
     setItem: (key: string, value: string) => storage.set(key, value) };
   const scope = { document, URL, addEventListener() {}, Audio: FakeAudio, console, localStorage, scene,
-    festivalNarration: { 'dadiIntro-1': 'dadiIntro-1.mp3', 'dadiIntro-2': 'dadiIntro-2.mp3' } };
-  const { audio, lines, createAmbience } = runInNewContext(dialogueSource + '\n' + source +
+    festivalNarration: { 'dadiIntro-1': 'dadiIntro-1.mp3', 'dadiIntro-2': 'dadiIntro-2.mp3' },
+    festivalNarrationHindi: { 'dadiIntro-1': 'dadiIntro-1-hi.mp3', 'dadiIntro-2': 'dadiIntro-2-hi.mp3' } };
+  const { audio, lines, createAmbience } = runInNewContext(dialogueSource + '\n' + hindiSource + '\n' + source +
     "\n({ audio: createFestivalAudio(scene), lines: festivalDialogue.dadiIntro, createAmbience: createPositionalAmbience });", scope);
   function changeLevel(channel: string, value: number) {
     const slider = sliders[channel + 'Volume'];
     slider.valueAsNumber = value;
     slider.dispatchEvent(new Event('input'));
   }
-  return { audio, changeLevel, createAmbience, credit, document, lines, media, replay, sliders };
+  return { audio, changeLevel, createAmbience, credit, document, languageSelect, lines, media, replay, sliders, subtitle };
 }
 
 test('Apple preview starts with play, quiets during dialogue, and fades out without looping', () => {
@@ -245,13 +271,49 @@ test('positional ambience pans with the player and attenuates with distance', ()
   assert.deepEqual(levels, [.025, .025, 0]);
 });
 
-test('every authored narration cue has a shipped audio asset', () => {
-  const manifestSource = readFileSync(new URL('../audio/narration.js', import.meta.url), 'utf8');
-  const manifest = runInNewContext(manifestSource + '\nfestivalNarration;');
-  assert.deepEqual(Object.keys(manifest), [...narrationCues().keys()]);
-  for (const [id, filename] of Object.entries(manifest)) {
-    assert.equal(filename, id + '.mp3');
-    const asset = readFileSync(new URL('../audio/' + filename, import.meta.url));
-    assert.ok(asset.length > 1000, filename);
+test('language changes replace the current subtitle, resume with matching speech, and persist', () => {
+  const storage = new Map<string, string>();
+  const hub = setupPlayback(storage);
+  const { audio, lines, languageSelect, media, replay, subtitle } = hub;
+  assert.equal(languageSelect.value, 'en-IN');
+  audio.start();
+  audio.narrateDialogue(lines, 1);
+  assert.equal(subtitle.textContent, lines[1][1]);
+  assert.equal(subtitle.lang, 'en');
+  audio.pause(true);
+  languageSelect.value = 'hi-IN';
+  languageSelect.dispatchEvent(new Event('change'));
+  assert.equal(subtitle.textContent, 'दादी, आसमान में ये सारे द्वीप क्यों तैर रहे हैं?');
+  assert.equal(subtitle.lang, 'hi');
+  assert.equal(media.length, 2);
+  assert.equal(media[1].paused, true);
+  assert.equal(replay.disabled, true);
+  audio.pause(false);
+  assert.equal(media[2].src, 'file:///festival/audio/dadiIntro-2-hi.mp3');
+  replay.dispatchEvent(new Event('click'));
+  assert.equal(media[2].paused, true);
+  assert.equal(media[3].src, media[2].src);
+
+  const island = setupPlayback(storage, 'diwali');
+  assert.equal(island.languageSelect.value, 'hi-IN');
+  assert.equal(island.audio.transitionText('diwaliToday', 'English'), 'आज भी दिवाली की रात घरों में इसी तरह दीये जलते हैं।');
+  island.languageSelect.value = 'en-IN';
+  island.languageSelect.dispatchEvent(new Event('change'));
+  assert.equal(island.audio.transitionText('diwaliToday', 'English'), 'English');
+});
+
+test('every authored cue ships an audio asset in both languages', () => {
+  for (const [source, variable, language, suffix] of [
+    ['narration.js', 'festivalNarration', 'en-IN', ''],
+    ['narration-hi.js', 'festivalNarrationHindi', 'hi-IN', '-hi'],
+  ] as const) {
+    const manifestSource = readFileSync(new URL('../audio/' + source, import.meta.url), 'utf8');
+    const manifest = runInNewContext(manifestSource + '\n' + variable + ';');
+    assert.deepEqual(Object.keys(manifest), [...narrationCues(language).keys()]);
+    for (const [id, filename] of Object.entries(manifest)) {
+      assert.equal(filename, id + suffix + '.mp3');
+      const asset = readFileSync(new URL('../audio/' + filename, import.meta.url));
+      assert.ok(asset.length > 1000, String(filename));
+    }
   }
 });
