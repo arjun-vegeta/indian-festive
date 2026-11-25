@@ -65,6 +65,7 @@
   #dlg .who{font-weight:800;font-size:12.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
   #dlg .who.you{color:var(--kb)}
   #dlg .line{font-size:20px;line-height:1.35;margin:1px 0 4px;font-weight:600}
+  #replayLine{pointer-events:auto;font-weight:400;font-size:inherit;margin-right:8px}
   #dlg .more{font-size:12.5px;color:var(--muted);text-align:right;font-weight:700}
   #bal{position:absolute;left:50%;top:50%;opacity:0;transition:opacity .3s}
   #bal.show{opacity:1}
@@ -104,6 +105,7 @@
   button.go{background:var(--accent);box-shadow:3px 3px 0 var(--ink)}
   button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
   .sets{display:grid;grid-template-columns:1fr 1fr;gap:10px 22px;border-top:1px solid var(--rule);padding-top:12px;margin:0 0 14px}
+  #narrationLanguage{font:inherit;width:100%;padding:2px 6px;color:var(--ink);background:var(--paper);border:1px solid var(--rule);border-radius:6px}
   .sets label{display:block;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:800;margin-bottom:2px}
   input[type=range]{width:100%;accent-color:var(--ink)}
   #test{position:fixed;left:12px;bottom:12px;z-index:20;background:var(--paper);border:2px solid var(--ink);border-radius:12px;box-shadow:4px 4px 0 var(--ink);
@@ -135,7 +137,7 @@
     <circle id="balDot" r="9" fill="#f6b93b" stroke="#2a2118" stroke-width="2.6"/>
   </svg></div>
   <div id="prompt"></div>
-  <div id="dlg" role="dialog" aria-live="polite"><div class="who" id="dlgWho"></div><div class="line" id="dlgLine"></div><div class="more">E, Space or click to go on</div></div>
+  <div id="dlg" role="dialog" aria-live="polite"><div class="who" id="dlgWho"></div><div class="line" id="dlgLine"></div><div class="more"><button type="button" id="replayLine" hidden>Replay line (R)</button>E, Space or click to go on</div></div>
 </div>
 
 <div class="card" id="title" hidden>
@@ -169,7 +171,9 @@
       <div><label for="sWob">Hand-drawn wobble</label><input id="sWob" type="range" min="0" max="7" step="0.1" value="1.8"></div>
       <div><label for="sGrain">Paper grain</label><input id="sGrain" type="range" min="0" max="1" step="0.05" value="0.8"></div>
       <div><label for="sSens">Mouse speed</label><input id="sSens" type="range" min="0.3" max="2.5" step="0.05" value="1"></div>
-      <div><label for="sVol">Sound</label><input id="sVol" type="range" min="0" max="1" step="0.05" value="0.7"></div>
+      <div><label for="voiceVolume">Voice</label><input id="voiceVolume" type="range" min="0" max="1" step="0.05" value="0.7"></div>
+      <div><label for="effectsVolume">Effects</label><input id="effectsVolume" type="range" min="0" max="1" step="0.05" value="0.7"></div>
+      <div><label for="narrationLanguage">Narration language</label><select id="narrationLanguage"><option value="en-IN">English</option><option value="hi-IN" lang="hi">हिन्दी</option></select></div>
     </div>
     <div class="row"><button id="restart">Start again</button><button class="go" id="resume">Resume</button></div>
   </div>
@@ -196,6 +200,11 @@
 <div id="fatal"></div>
 <div id="fade"><svg aria-hidden="true"><filter id="grainF"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter><rect width="100%" height="100%" filter="url(#grainF)" opacity=".22"/></svg><div id="fadeT"></div></div>
 
+<script src="../audio/dialogue.js"></script>
+<script src="../audio/dialogue-hindi.js"></script>
+<script src="../audio/narration.js"></script>
+<script src="../audio/narration-hi.js"></script>
+<script src="../audio/playback.js"></script>
 <script type="module">
 import * as THREE from 'three';
 THREE.ColorManagement.enabled = false;
@@ -816,14 +825,15 @@ const G = { beat: 'gods', step: 0, t: 0, beatT: 0, dusk: 0, stuck: 0, flash: 0, 
   taps: 0, tapT: 9, tapHand: 0, sway: 0, swayX: 0, offer: 0, flowers: false, rail: 0, today: false, petalRain: false, dhakT: 0, dhakI: 0, holdPrev: false, holdPrompt: false,
   dlg: null, ended: false, paused: false, started: false, glowing: [], hintShown: 0, objTarget: null, hints: [], ev: {}, overview: false, fromHub: false, lids: 1 };
 const inp = { f: 0, b: 0, l: 0, r: 0, hold: false, sp: 0, mdx: 0, mdy: 0 };
-const SET = { wob: 1.8, grain: .8, sens: 1, vol: .7 };
+const SET = { wob: 1.8, grain: .8, sens: 1 };
 const TRI = gTrishul(); TRI.scale.setScalar(1.1); world.add(TRI); TRI.visible = false;
 
 /* ---------------- sound: synthesised conch, bells, dhak, roar, ululation ---------------- */
+const festivalAudio = createFestivalAudio();
 const sfx = (() => {
   let ctx = null, master, windG, windBP, humG, noiseBuf;
   function init(){ if (ctx) return; try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
-    master = ctx.createGain(); master.gain.value = SET.vol; master.connect(ctx.destination);
+    master = ctx.createGain(); master.gain.value = festivalAudio.effectsVolume(); master.connect(ctx.destination);
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate*2, ctx.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random()*2 - 1;
     const loop = () => { const s = ctx.createBufferSource(); s.buffer = noiseBuf; s.loop = true; s.start(); return s; };
     windBP = ctx.createBiquadFilter(); windBP.type = 'bandpass'; windBP.frequency.value = 380; windBP.Q.value = .8; windG = ctx.createGain(); windG.gain.value = .015;
@@ -835,7 +845,7 @@ const sfx = (() => {
   function tone(t, type, f, f2, peak, a, rel){ const o = ctx.createOscillator(), g = ctx.createGain(); o.type = type; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + a + rel);
     o.connect(g); g.connect(master); env(g, t, a, peak, rel); o.start(t); o.stop(t + a + rel + .05); return o; }
   return {
-    init, vol(v){ if (master) master.gain.value = v; },
+    init, vol(v){ if (master) master.gain.setTargetAtTime(v, ctx.currentTime, .05); },
     bell(){ if (!ctx) return; const t = ctx.currentTime; for (const [f, v] of [[880, .12], [1326, .06], [2210, .03]]) tone(t, 'sine', f, 0, v, .005, 1.8); },
     chime(){ if (!ctx) return; const t = ctx.currentTime; tone(t, 'sine', 1320, 0, .09, .005, .9); tone(t + .09, 'sine', 1760, 0, .07, .005, 1.1); tone(t, 'triangle', 660, 0, .05, .005, .6); },
     tick(){ if (!ctx) return; tone(ctx.currentTime, 'triangle', 1700, 1200, .08, .004, .09); },
@@ -896,12 +906,12 @@ function drawBubbles(){ const W = innerWidth, Hh = innerHeight, edgeY = { '-1': 
     b.el.style.left = x + 'px'; b.el.style.top = (edge ? y - 20 : y - 8) + 'px'; b.el.style.opacity = 1; } }
 const dlgEl = $('dlg');
 function dialog(n, lines, done){ G.dlg = { n, lines, i: 0, done, look: n }; dlgEl.style.display = 'block'; showLine(); progress(); }
-function showLine(){ const [who, text] = G.dlg.lines[G.dlg.i], you = who === 'you'; if (!you && NAMED[who]) G.dlg.look = NAMED[who];
-  $('dlgWho').textContent = you ? 'Durga (you)' : who; $('dlgWho').className = 'who' + (you ? ' you' : ''); $('dlgLine').textContent = text; }
-function advance(){ if (!G.dlg) return; G.dlg.i++; if (G.dlg.i >= G.dlg.lines.length){ const f = G.dlg.done; G.dlg = null; dlgEl.style.display = 'none'; if (f) f(); } else showLine(); }
+function showLine(){ const [who] = G.dlg.lines[G.dlg.i], you = who === 'you'; if (!you && NAMED[who]) G.dlg.look = NAMED[who];
+  $('dlgWho').textContent = you ? 'Durga (you)' : who; $('dlgWho').className = 'who' + (you ? ' you' : ''); festivalAudio.narrateDialogue(G.dlg.lines, G.dlg.i); }
+function advance(){ if (!G.dlg) return; festivalAudio.stopDialogue(); G.dlg.i++; if (G.dlg.i >= G.dlg.lines.length){ const f = G.dlg.done; G.dlg = null; dlgEl.style.display = 'none'; if (f) f(); } else showLine(); }
 const fadeEl = $('fade');
 function fade(on, text = ''){ $('fadeT').textContent = text; fadeEl.style.opacity = on ? 1 : 0; fadeEl.style.pointerEvents = on ? 'auto' : 'none'; }
-function leave(href, title){ fade(true, title); setTimeout(() => { location.href = href; }, 640); }
+function leave(href, title){ festivalAudio.stop(); fade(true, title); setTimeout(() => { location.href = href; }, 640); }
 
 /* ---------------- the story, beat by beat ---------------- */
 const Y = 'you';
@@ -911,12 +921,7 @@ function setBeat(b){ G.beat = b; G.beatT = 0; G.ev = {}; G.step = 0; }
 function cheerGods(lines, list = GODS){ sfx.cheer(); list.forEach((n, i) => { n.cheerUntil = G.t + 2.6 + i*.1; }); lines.forEach(([id, t], i) => later(() => say(NPC[id], t, 3), 200 + i*900)); }
 function startGods(){ setBeat('gods'); setLids(1);
   objective('The gods are in trouble', null);
-  dialog(NPC.indra, [
-    ['Indra', 'Mahishasura, the buffalo demon, has taken heaven from us.'],
-    ['Brahma', 'Long ago I gave him a boon. No man and no god can defeat him.'],
-    ['Vishnu', 'Then let our light become one. Not a man, not a god: the Mother herself.'],
-    ['Shiva', 'Gather our light.'],
-  ], () => { G.step = 1; objective('Hold to gather the gods\' light', null, ['Hold the left mouse button, or Space. Keep holding while the light gathers.']); }); }
+  dialog(NPC.indra, festivalDialogue.durgaGods, () => { G.step = 1; objective('Hold to gather the gods\' light', null, ['Hold the left mouse button, or Space. Keep holding while the light gathers.']); }); }
 function startAwake(){ setBeat('awake'); G.flash = 1; setLids(0); ORBG.visible = false; BEAMS.forEach(m => m.visible = false); objective('', null); sfx.bell(); sfx.ulu(); prompt('');
   const order = [2, 1, 3, 0, 4]; for (const A of ARMS){ A.showAt = G.t + .9 + order.indexOf(A.i)*.2; } }
 function startGifts(){ setBeat('gifts');
@@ -933,21 +938,13 @@ function takeGift(n){ vm.updateMatrixWorld(true); const list = GIFTS.filter(q =>
 function startLion(){ setBeat('lion'); NPC.himavan.g.visible = true; place(NPC.himavan, -17, 6); LIONO.pos.set(-15.5, 7.6);
   NPC.himavan.path = [new V2(-4.6, 9.6), new V2(-2.2, 10.4)]; NPC.himavan.speed = 3.2; NPC.himavan.look = 'player'; LIONO.target = new V2(.6, 10.8);
   objective('Someone is coming with a lion', () => LIONO.g.position.clone().setY(1.4)); later(() => sfx.roar(), 600); }
-function talkHimavan(){ dialog(NPC.himavan, [
-  ['Himavan', 'Ma, I am Himavan, king of the mountains. I bring you a lion from my snows.'],
-  ['Himavan', 'He will carry you to Mahishasura, faster than any wind.'],
-  [Y, 'Then let us ride, and give heaven back to the gods.'],
-], () => { G.step = 1; objective('Ride the lion', () => LIONO.g.position.clone().setY(1.4), ['The lion waits beside Himavan, where the circle opens.', 'Walk up to the glowing lion and press E.']); setGlow([LIONO.g]); }); }
+function talkHimavan(){ dialog(NPC.himavan, festivalDialogue.durgaLion, () => { G.step = 1; objective('Ride the lion', () => LIONO.g.position.clone().setY(1.4), ['The lion waits beside Himavan, where the circle opens.', 'Walk up to the glowing lion and press E.']); setGlow([LIONO.g]); }); }
 function mountLion(){ G.riding = true; G.mountT = 0; G.mountFrom.copy(player.pos); setGlow([]); sfx.roar(); progress(); setBeat('ride');
   objective('Ride to Mahishasura', () => mhChest(), ['He stands at the far end of heaven, in front of the palace he took.', 'Hold W to ride. Hold Shift to run even faster.']);
   caption('On the lion', 'you see further, and run faster'); later(() => caption(''), 2600);
   GODS.forEach((n, i) => { n.path = [new V2(lerp(-9, 9, i/8), -1.5 + Math.abs(i - 4)*.5)]; n.delay = G.t + .4 + i*.15; n.speed = 3.4; n.look = null; }); NPC.himavan.path = [new V2(-10.5, 1.5)]; NPC.himavan.delay = G.t + 1; }
 function startBattle(){ setBeat('battle'); MH.state = 'intro'; setGlow([]); objective('Mahishasura', null);
-  dialog(MHN, [
-    ['Mahishasura', 'Who is this? No man and no god can defeat me!'],
-    [Y, 'I am not a man, and not a god. I am the light of them all.'],
-    ['Mahishasura', 'Then catch me, if you can!'],
-  ], () => { MH.state = 'vanish'; MH.t = 0; sfx.roar(); }); }
+  dialog(MHN, festivalDialogue.durgaBattle, () => { MH.state = 'vanish'; MH.t = 0; sfx.roar(); }); }
 function whirlObjective(){ objective('He is changing shape. Turn to face him', () => new V3(MH.pos.x, 2, MH.pos.y), ['Look for the whirl of dark dust. Turn until it is in front of you.', 'Move the mouse to turn until the dark dust is in the middle of the view.']); }
 function readyObjective(){ G.aimTarget = mhChest; G.need = [.9, 1, 1.1, 1.2][MH.round]; G.step = 1;
   objective(`Hold to steady the trishul at the ${FORM_NAME[MH.cur]}, then let go`, mhChest, ['Face him and hold the left mouse button (or Space). When the trishul shakes, move the mouse against it to keep the gold dot in the ring.', 'Keep holding until the gold ring fills all the way round, then let go.']); }
@@ -971,12 +968,7 @@ function swapToToday(){ ANC.visible = false; TODAY.visible = true; G.today = tru
   for (const A of ARMS){ if (A.gift){ A.gift.obj.visible = false; A.gift = null; } if (!MAIN.includes(A)){ A.show = A.showT = 0; A.showAt = 1e9; } else { A.show = A.showT = 1; } A.grip = 0; }
   SHIELD.visible = false; player.pos.set(0, 9.2); player.yaw = 0; player.pitch = .05; player.eye = 1.7; NPCS.forEach(n => { n.target = null; n.path = []; }); }
 function startHome(){ setBeat('home');
-  dialog(NPC.thakuma, [
-    ['Thakuma', 'Esho, Ma! Come in, come in. Durga Puja has begun.'],
-    ['Thakuma', 'Every autumn, Ma Durga comes home to her parents, with her four children. For five days, we are all her family.'],
-    [Y, 'I can hear the dhak from here.'],
-    ['Thakuma', 'Then go! Gopal Kaku will give you his sticks.'],
-  ], () => { G.step = 1; objective('Play the dhak with Gopal Kaku', () => npcAt(NPC.gopal), ['Gopal Kaku is the drummer with the big dhak and its white plume, by the pandal.', 'Walk up to the glowing drummer and press E.']); setGlow([NPC.gopal.g]); }); }
+  dialog(NPC.thakuma, festivalDialogue.durgaHome, () => { G.step = 1; objective('Play the dhak with Gopal Kaku', () => npcAt(NPC.gopal), ['Gopal Kaku is the drummer with the big dhak and its white plume, by the pandal.', 'Walk up to the glowing drummer and press E.']); setGlow([NPC.gopal.g]); }); }
 function talkGopal(){ dialog(NPC.gopal, [['Gopal Kaku', 'Ma! Take these sticks. Play along with us.'], ['Gopal Kaku', 'Dhin-dhin-ta! Tap with the beat. Nobody counts, just play.']],
   () => { setBeat('dhak'); G.taps = 0; setGlow([]); objective('Play the dhak with the drummers', null, ['Click, or press Space, along with the drum beat.']); }); }
 function tapDhak(){ G.taps++; G.tapT = 0; G.tapHand ^= 1; sfx.dhak(1); progress(); vm.updateMatrixWorld(true); ripple(HOLD.drum.getWorldPosition(new V3()).setY(.06), TOMATO, 3, .7); }
@@ -1030,6 +1022,7 @@ document.addEventListener('pointerlockchange', () => { locked = document.pointer
 function grab(){ if (!canLock) return; lockWanted = true; try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (e) {} }
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('mousedown', e => { sfx.init(); if (!G.started || G.paused || G.ended) return;
+  festivalAudio.start();
   if (G.dlg && e.button === 0){ advance(); return; }
   if (canLock && !locked) grab();
   if (e.button === 0){ inp.hold = true; if (!locked){ dragging = true; lastX = e.clientX; lastY = e.clientY; } } });
@@ -1043,20 +1036,22 @@ const KEYS = { KeyW: 'f', ArrowUp: 'f', KeyS: 'b', ArrowDown: 'b', KeyA: 'l', Ar
 addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; sfx.init();
   if (e.code === 'Escape' || e.code === 'KeyP'){ if (G.started && !G.ended) pauseGame(!G.paused); return; }
   if (!G.started || G.paused || G.ended) return;
+  festivalAudio.start();
   if (KEYS[e.code]){ inp[KEYS[e.code]] = 1; e.preventDefault(); }
   if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') inp.sp = 1;
   if (e.code === 'KeyE' || e.code === 'Enter'){ if (G.dlg) advance(); else { const t = focusTarget(); if (t) t.use(); } }
   if (e.code === 'Space'){ e.preventDefault(); if (G.dlg){ if (!e.repeat) advance(); } else if (G.holdPrompt || inp.hold) inp.hold = true; else if (!e.repeat) jump(); } });
 addEventListener('keyup', e => { if (KEYS[e.code]) inp[KEYS[e.code]] = 0; if (e.code === 'Space') inp.hold = false; if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') inp.sp = 0; });
 addEventListener('blur', () => { inp.f = inp.b = inp.l = inp.r = inp.sp = 0; inp.hold = false; dragging = false; });
-function pauseGame(on){ G.paused = on; $('pause').hidden = !on; if (on){ inp.hold = false; inp.f = inp.b = inp.l = inp.r = inp.sp = 0; if (locked) document.exitPointerLock(); } else grab(); }
+function pauseGame(on){ festivalAudio.pause(on); G.paused = on; $('pause').hidden = !on; if (on){ inp.hold = false; inp.f = inp.b = inp.l = inp.r = inp.sp = 0; if (locked) document.exitPointerLock(); } else grab(); }
 $('resume').onclick = () => pauseGame(false);
 $('restart').onclick = () => { fade(true); setTimeout(() => { location.hash = G.fromHub ? 'from=hub' : ''; location.reload(); }, 600); };
 $('again').onclick = () => { fade(true, 'Durga Puja · Durga and Mahishasura'); setTimeout(() => { location.hash = G.fromHub ? 'from=hub' : ''; location.reload(); }, 600); };
 $('back').onclick = () => leave('../index.html#done=durga-mahishasura', 'Back to the islands');
-$('begin').onclick = () => { $('title').hidden = true; G.started = true; sfx.init(); grab(); };
+$('begin').onclick = () => { $('title').hidden = true; G.started = true; sfx.init(); festivalAudio.start(); grab(); };
 $('sWob').oninput = e => SET.wob = +e.target.value; $('sGrain').oninput = e => SET.grain = +e.target.value;
-$('sSens').oninput = e => SET.sens = +e.target.value; $('sVol').oninput = e => { SET.vol = +e.target.value; sfx.vol(SET.vol); };
+$('sSens').oninput = e => SET.sens = +e.target.value;
+festivalAudio.bindEffects(sfx.vol);
 // jump: a small hop, a bigger leap on the lion. Never during a hold, a balance or a dialogue, and you land where you are
 function jump(){ if (!G.started || G.paused || G.ended || G.dlg || player.jy > 0 || inp.hold || G.drawing || camAuto() || !canWalk()) return; player.vy = G.riding ? 5.4 : 4.6; player.jy = 1e-4; }
 

@@ -54,9 +54,11 @@ const createFestivalAudio = (() => {
 
   return function createFestivalAudio(scene) {
     const track = tracks[scene];
-    const credit = document.getElementById('musicCredit');
-    credit.href = track.link;
-    credit.textContent = `${track.title} · ${track.artist} · Apple Music`;
+    if (track) {
+      const credit = document.getElementById('musicCredit');
+      credit.href = track.link;
+      credit.textContent = `${track.title} · ${track.artist} · Apple Music`;
+    }
 
     const settings = loadSettings();
     const { levels } = settings;
@@ -111,6 +113,7 @@ const createFestivalAudio = (() => {
 
     for (const [channel, level] of Object.entries(levels)) {
       const input = document.getElementById(channel + 'Volume');
+      if (!input) continue;
       input.value = level;
       input.addEventListener('input', () => setLevel(channel, input.valueAsNumber));
     }
@@ -176,7 +179,7 @@ const createFestivalAudio = (() => {
     }
 
     function musicCue() {
-      if (!canPlay('music') || musicActive) return;
+      if (!track || !canPlay('music') || musicActive) return;
       if (!music) {
         music = new Audio(track.preview);
         music.addEventListener('ended', stopMusic);
@@ -197,6 +200,7 @@ const createFestivalAudio = (() => {
       started = true;
       refreshReplay();
       musicCue();
+      replayLine();
     }
 
     function tick(dialogueOpen, dt) {
